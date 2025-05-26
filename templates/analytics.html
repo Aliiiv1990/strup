@@ -1,102 +1,62 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>تحلیل و گزارشات - پلتفرم واتساپ</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; direction: rtl; }
-        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
-        nav h1 { margin: 0; }
-        nav ul { list-style-type: none; padding: 0; }
-        nav ul li { display: inline; margin: 0 15px; }
-        nav ul li a { color: white; text-decoration: none; }
-        main { padding: 20px; }
-        h1, h2 { color: #333; text-align: right; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        section { background-color: white; margin-bottom: 20px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .form-inline { margin-bottom: 30px; padding: 15px; background-color: #e9ecef; border-radius: 5px; }
-        .form-inline label { margin-left: 10px; font-weight: bold; }
-        .form-inline input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-left: 15px; }
-        .form-inline button { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .form-inline button:hover { background-color: #0056b3; }
-        .analytics-section p { margin: 5px 0 10px; font-size: 1.1em; }
-        .analytics-section strong { color: #555; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
-        th { background-color: #f0f0f0; }
-        .chart-placeholder {
-            border: 1px dashed #ced4da; padding: 50px; text-align: center; color: #777;
-            background-color: #f8f9fa; border-radius: 5px; margin-top: 15px; font-style: italic;
-        }
-    </style>
-</head>
-<body>
-    <nav> <!-- Placeholder for navigation -->
-        <h1>پلتفرم واتساپ</h1>
-        <ul>
-            <li><a href="{{ url_for('dashboard_route') }}">داشبورد</a></li>
-            <li><a href="{{ url_for('contact_lists_route') }}">مخاطبین</a></li>
-            <li><a href="{{ url_for('broadcasts_route') }}">ارسال‌های گروهی</a></li>
-            <li><a href="{{ url_for('chatbot_rules_route') }}">قوانین چت‌بات</a></li>
-            <li><a href="{{ url_for('analytics_route') }}">تحلیل و گزارشات</a></li>
-        </ul>
-    </nav>
-    <main>
-        <h1>تحلیل و گزارشات پلتفرم</h1>
+{% extends "base.html" %}
 
-        <form method="GET" action="{{ url_for('analytics_route') }}" class="form-inline">
-            <label for="start_date">از تاریخ:</label>
-            <input type="date" name="start_date" id="start_date" value="{{ request_args.get('start_date', '') }}">
-            <label for="end_date">تا تاریخ:</label>
-            <input type="date" name="end_date" id="end_date" value="{{ request_args.get('end_date', '') }}">
-            <button type="submit">اعمال فیلتر</button>
-        </form>
+{% block title %}تحلیل و گزارشات - پلتفرم واتساپ{% endblock %}
 
-        {% if analytics_data %}
-            <section class="analytics-section">
-                <h2>آمار پیام‌ها</h2>
-                <p><strong>تعداد کل پیام‌های ارسالی:</strong> {{ analytics_data.message_counts.sent }}</p>
-                <p><strong>تعداد کل پیام‌های دریافتی:</strong> {{ analytics_data.message_counts.received }}</p>
-                <p><strong>مجموع کل پیام‌ها:</strong> {{ analytics_data.message_counts.total }}</p>
-            </section>
+{% block content %}
+<h1>تحلیل و گزارشات پلتفرم</h1>
 
-            <section class="analytics-section">
-                <h2>کلمات کلیدی پرتکرار</h2>
-                {% if analytics_data.common_keywords and analytics_data.common_keywords|length > 0 %}
-                <table>
-                    <thead>
-                        <tr>
-                            <th>کلمه کلیدی</th>
-                            <th>تعداد تکرار</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for kw, count in analytics_data.common_keywords %}
-                        <tr>
-                            <td>{{ kw }}</td>
-                            <td>{{ count }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p>داده‌ای برای کلمات کلیدی در این بازه زمانی موجود نیست.</p>
-                {% endif %}
-            </section>
+<form method="GET" action="{{ url_for('analytics_route') }}" class="form-inline">
+    <label for="start_date">از تاریخ:</label>
+    <input type="date" name="start_date" id="start_date" value="{{ request_args.get('start_date', '') }}">
+    <label for="end_date">تا تاریخ:</label>
+    <input type="date" name="end_date" id="end_date" value="{{ request_args.get('end_date', '') }}">
+    <button type="submit">اعمال فیلتر</button>
+</form>
 
-            <section class="analytics-section">
-                <h2>تحلیل احساسات کلی (شبیه‌سازی شده)</h2>
-                {% if analytics_data.sentiment_overview %}
-                <p><strong>پیام‌های مثبت:</strong> {{ analytics_data.sentiment_overview.positive }}</p>
-                <p><strong>پیام‌های منفی:</strong> {{ analytics_data.sentiment_overview.negative }}</p>
-                <p><strong>پیام‌های خنثی:</strong> {{ analytics_data.sentiment_overview.neutral }}</p>
-                <div class="chart-placeholder">[نمودار توزیع احساسات - در آینده اضافه خواهد شد]</div>
-                {% else %}
-                <p>داده‌ای برای تحلیل احساسات در این بازه زمانی موجود نیست.</p>
-                {% endif %}
-            </section>
+{% if analytics_data %}
+    <section class="analytics-section">
+        <h2>آمار پیام‌ها</h2>
+        <p><strong>تعداد کل پیام‌های ارسالی:</strong> {{ analytics_data.message_counts.sent }}</p>
+        <p><strong>تعداد کل پیام‌های دریافتی:</strong> {{ analytics_data.message_counts.received }}</p>
+        <p><strong>مجموع کل پیام‌ها:</strong> {{ analytics_data.message_counts.total }}</p>
+    </section>
+
+    <section class="analytics-section">
+        <h2>کلمات کلیدی پرتکرار</h2>
+        {% if analytics_data.common_keywords and analytics_data.common_keywords|length > 0 %}
+        <table>
+            <thead>
+                <tr>
+                    <th>کلمه کلیدی</th>
+                    <th>تعداد تکرار</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for kw, count in analytics_data.common_keywords %}
+                <tr>
+                    <td>{{ kw }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
-            <p>داده‌ای برای نمایش وجود ندارد. لطفا بازه زمانی را انتخاب و فیلتر کنید.</p>
+        <p>داده‌ای برای کلمات کلیدی در این بازه زمانی موجود نیست.</p>
         {% endif %}
-    </main>
-</body>
-</html>
+    </section>
+
+    <section class="analytics-section">
+        <h2>تحلیل احساسات کلی (شبیه‌سازی شده)</h2>
+        {% if analytics_data.sentiment_overview %}
+        <p><strong>پیام‌های مثبت:</strong> {{ analytics_data.sentiment_overview.positive }}</p>
+        <p><strong>پیام‌های منفی:</strong> {{ analytics_data.sentiment_overview.negative }}</p>
+        <p><strong>پیام‌های خنثی:</strong> {{ analytics_data.sentiment_overview.neutral }}</p>
+        <div class="chart-placeholder">[نمودار توزیع احساسات - در آینده اضافه خواهد شد]</div>
+        {% else %}
+        <p>داده‌ای برای تحلیل احساسات در این بازه زمانی موجود نیست.</p>
+        {% endif %}
+    </section>
+{% else %}
+    <p>داده‌ای برای نمایش وجود ندارد. لطفا بازه زمانی را انتخاب و فیلتر کنید.</p>
+{% endif %}
+{% endblock %}

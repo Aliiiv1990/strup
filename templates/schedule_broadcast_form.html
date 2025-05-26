@@ -1,99 +1,51 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>زمان‌بندی ارسال گروهی جدید - پلتفرم واتساپ</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; direction: rtl; }
-        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
-        nav h1 { margin: 0; }
-        nav ul { list-style-type: none; padding: 0; }
-        nav ul li { display: inline; margin: 0 15px; }
-        nav ul li a { color: white; text-decoration: none; }
-        main { padding: 20px; max-width: 700px; margin: 20px auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1 { color: #333; text-align: right; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .form-group { margin-bottom: 15px; text-align: right; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input[type="text"], .form-group input[type="datetime-local"], .form-group select, .form-group textarea {
-            width: calc(100% - 22px); /* Adjust for padding and border */
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .form-group textarea { min-height: 100px; }
-        .form-actions button {
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .form-actions button:hover { background-color: #218838; }
-        .form-actions a {
-            margin-right: 10px;
-            color: #007bff;
-            text-decoration: none;
-        }
-        .form-actions a:hover { text-decoration: underline; }
-        .help-text { font-size: 0.9em; color: #666; }
-    </style>
-</head>
-<body>
-    <nav> <!-- Placeholder for navigation -->
-        <h1>پلتفرم واتساپ</h1>
-        <ul>
-            <li><a href="{{ url_for('dashboard_route') }}">داشبورد</a></li>
-            <li><a href="{{ url_for('contact_lists_route') }}">مخاطبین</a></li>
-            <li><a href="{{ url_for('broadcasts_route') }}">ارسال‌های گروهی</a></li>
-        </ul>
-    </nav>
-    <main>
-        <h1>زمان‌بندی ارسال گروهی جدید</h1>
-        <form method="POST" action="{{ url_for('create_broadcast_route') }}">
-            <div class="form-group">
-                <label for="broadcast_name">نام ارسال گروهی (اختیاری، برای یادآوری شما):</label>
-                <input type="text" id="broadcast_name" name="broadcast_name" placeholder="مثلا: کمپین تخفیف نوروزی">
-            </div>
+{% extends "base.html" %}
 
-            <div class="form-group">
-                <label for="message_content_id">قالب پیام:</label>
-                <select name="message_content_id" id="message_content_id" required>
-                    <option value="">-- انتخاب قالب پیام --</option>
-                    {% for msg_template in available_message_templates %}
-                    <option value="{{ msg_template.id }}">{{ msg_template.name }} ({{ msg_template.body_snippet }})</option>
-                    {% endfor %}
-                </select>
-                <p class="help-text">برای ایجاد قالب جدید، به بخش مدیریت محتوای پیام مراجعه کنید (لینک در آینده).</p>
-            </div>
+{% block title %}زمان‌بندی ارسال گروهی جدید - پلتفرم واتساپ{% endblock %}
 
-            <div class="form-group">
-                <label for="contact_list_ids">لیست(های) مخاطبین هدف:</label>
-                <select name="contact_list_ids" id="contact_list_ids" multiple required size="5">
-                     {% for cl_list in available_contact_lists %}
-                    <option value="{{ cl_list.id }}">{{ cl_list.name }} ({{ cl_list.contact_count }} مخاطب)</option>
-                    {% endfor %}
-                </select>
-                <p class="help-text">برای انتخاب چند لیست، کلید Ctrl (یا Cmd در مک) را نگه دارید و کلیک کنید.</p>
-            </div>
+{% block content %}
+<h1>زمان‌بندی ارسال گروهی جدید</h1>
+<form method="POST" action="{{ url_for('create_broadcast_route') }}">
+    <div class="form-group">
+        <label for="broadcast_name">نام ارسال گروهی (اختیاری، برای یادآوری شما):</label>
+        <input type="text" id="broadcast_name" name="broadcast_name" placeholder="مثلا: کمپین تخفیف نوروزی">
+    </div>
 
-            <div class="form-group">
-                <label for="scheduled_time">زمان ارسال:</label>
-                <input type="datetime-local" name="scheduled_time" id="scheduled_time" required>
-                <p class="help-text">زمان ارسال پیام را با دقت انتخاب کنید.</p>
-            </div>
-            
-            <div class="form-group">
-                <label for="personalization_placeholders">مقادیر شخصی‌سازی کمپین (فرمت JSON، اختیاری):</label>
-                <textarea id="personalization_placeholders" name="personalization_placeholders" rows="3" placeholder='مثال: {"کد_تخفیف": "BAHAR1403", "نام_کمپین": "جشنواره بهاری"}'></textarea>
-                <p class="help-text">این مقادیر می‌توانند در متن پیام با فرمت <code>{{broadcast_کد_تخفیف}}</code> استفاده شوند.</p>
-            </div>
+    <div class="form-group">
+        <label for="message_content_id">قالب پیام:</label>
+        <select name="message_content_id" id="message_content_id" required>
+            <option value="">-- انتخاب قالب پیام --</option>
+            {% for msg_template in available_message_templates %}
+            <option value="{{ msg_template.id }}">{{ msg_template.name }} ({{ msg_template.body_snippet }})</option>
+            {% endfor %}
+        </select>
+        <p class="help-text">برای ایجاد قالب جدید، به بخش مدیریت محتوای پیام مراجعه کنید (لینک در آینده).</p>
+    </div>
 
-            <div class="form-actions">
-                <button type="submit">زمان‌بندی ارسال</button>
-                <a href="{{ url_for('broadcasts_route') }}">انصراف</a>
-            </div>
-        </form>
-    </main>
-</body>
-</html>
+    <div class="form-group">
+        <label for="contact_list_ids">لیست(های) مخاطبین هدف:</label>
+        <select name="contact_list_ids" id="contact_list_ids" multiple required size="5">
+             {% for cl_list in available_contact_lists %}
+            <option value="{{ cl_list.id }}">{{ cl_list.name }} ({{ cl_list.contact_count }} مخاطب)</option>
+            {% endfor %}
+        </select>
+        <p class="help-text">برای انتخاب چند لیست، کلید Ctrl (یا Cmd در مک) را نگه دارید و کلیک کنید.</p>
+    </div>
+
+    <div class="form-group">
+        <label for="scheduled_time">زمان ارسال:</label>
+        <input type="datetime-local" name="scheduled_time" id="scheduled_time" required>
+        <p class="help-text">زمان ارسال پیام را با دقت انتخاب کنید.</p>
+    </div>
+    
+    <div class="form-group">
+        <label for="personalization_placeholders">مقادیر شخصی‌سازی کمپین (فرمت JSON، اختیاری):</label>
+        <textarea id="personalization_placeholders" name="personalization_placeholders" rows="3" placeholder='مثال: {"کد_تخفیف": "BAHAR1403", "نام_کمپین": "جشنواره بهاری"}'></textarea>
+        <p class="help-text">این مقادیر می‌توانند در متن پیام با فرمت <code>{{broadcast_کد_تخفیف}}</code> استفاده شوند.</p>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit">زمان‌بندی ارسال</button>
+        <a href="{{ url_for('broadcasts_route') }}">انصراف</a>
+    </div>
+</form>
+{% endblock %}

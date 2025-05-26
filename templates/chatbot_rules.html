@@ -1,132 +1,78 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>مدیریت قوانین چت‌بات - پلتفرم واتساپ</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; direction: rtl; }
-        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
-        nav h1 { margin: 0; }
-        nav ul { list-style-type: none; padding: 0; }
-        nav ul li { display: inline; margin: 0 15px; }
-        nav ul li a { color: white; text-decoration: none; }
-        main { padding: 20px; }
-        h1, h2 { color: #333; text-align: right; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
-        th { background-color: #f0f0f0; }
-        .actions a { margin-left: 10px; text-decoration: none; color: #007bff; }
-        .actions a:hover { text-decoration: underline; }
-        .form-section {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        .form-group { margin-bottom: 15px; text-align: right; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input[type="text"], .form-group textarea, .form-group select {
-            width: calc(100% - 24px); /* Adjust for padding and border */
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .form-group textarea { min-height: 80px; }
-        .form-actions button {
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .form-actions button:hover { background-color: #218838; }
-    </style>
-</head>
-<body>
-    <nav> <!-- Placeholder for navigation -->
-        <h1>پلتفرم واتساپ</h1>
-        <ul>
-            <li><a href="{{ url_for('dashboard_route') }}">داشبورد</a></li>
-            <li><a href="{{ url_for('contact_lists_route') }}">مخاطبین</a></li>
-            <li><a href="{{ url_for('broadcasts_route') }}">ارسال‌های گروهی</a></li>
-            <li><a href="{{ url_for('chatbot_rules_route') }}">قوانین چت‌بات</a></li>
-        </ul>
-    </nav>
-    <main>
-        <h1>مدیریت قوانین چت‌بات</h1>
+{% extends "base.html" %}
 
-        <section class="form-section">
-            <h2>{{ 'ویرایش قانون' if editing_rule else 'افزودن قانون جدید' }}</h2>
-            <form method="POST" action="{{ url_for('save_chatbot_rule_route') }}">
-                <input type="hidden" name="rule_id" value="{{ editing_rule.id if editing_rule else '' }}">
-                
-                <div class="form-group">
-                    <label for="rule_name">نام قانون:</label>
-                    <input type="text" name="rule_name" id="rule_name" value="{{ editing_rule.name if editing_rule else '' }}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="keywords">کلمات کلیدی (با کاما جدا شوند):</label>
-                    <textarea name="keywords" id="keywords" rows="3" required>{{ editing_rule.keywords_str if editing_rule else '' }}</textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="response_text">متن پاسخ:</label>
-                    <textarea name="response_text" id="response_text" rows="4" required>{{ editing_rule.response_text if editing_rule else '' }}</textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="match_type">نوع تطابق:</label>
-                    <select name="match_type" id="match_type">
-                        <option value="any" {% if editing_rule and editing_rule.match_type == 'any' %}selected{% endif %}>هر کلمه کلیدی (Any Keyword)</option>
-                        <option value="exact" {% if editing_rule and editing_rule.match_type == 'exact' %}selected{% endif %}>عبارت دقیق (Exact Phrase - شبیه‌سازی شده)</option>
-                        <!-- Add more match types as needed -->
-                    </select>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit">{{ 'ذخیره تغییرات' if editing_rule else 'افزودن قانون' }}</button>
-                    {% if editing_rule %}
-                        <a href="{{ url_for('chatbot_rules_route') }}" style="margin-left: 10px;">لغو ویرایش</a>
-                    {% endif %}
-                </div>
-            </form>
-        </section>
+{% block title %}مدیریت قوانین چت‌بات - پلتفرم واتساپ{% endblock %}
 
-        <section>
-            <h2>لیست قوانین موجود</h2>
-            {% if chatbot_rules_data %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>نام قانون</th>
-                        <th>کلمات کلیدی</th>
-                        <th>متن پاسخ (خلاصه)</th>
-                        <th>نوع تطابق</th>
-                        <th>عملیات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for rule in chatbot_rules_data %}
-                    <tr>
-                        <td>{{ rule.name }}</td>
-                        <td>{{ rule.keywords_str }}</td>
-                        <td>{{ rule.response_text[:50] }}{% if rule.response_text|length > 50 %}...{% endif %}</td> {# Show snippet #}
-                        <td>{{ 'هر کلمه کلیدی' if rule.match_type == 'any' else 'عبارت دقیق' }}</td>
-                        <td class="actions">
-                            <a href="{{ url_for('chatbot_rules_route', edit_rule_id=rule.id) }}">ویرایش</a> | 
-                            <a href="#">حذف</a> {# Placeholder for delete action #}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p>هنوز هیچ قانون چت‌باتی تعریف نشده است.</p>
+{% block content %}
+<h1>مدیریت قوانین چت‌بات</h1>
+
+<section class="form-section">
+    <h2>{{ 'ویرایش قانون' if editing_rule else 'افزودن قانون جدید' }}</h2>
+    <form method="POST" action="{{ url_for('save_chatbot_rule_route') }}">
+        <input type="hidden" name="rule_id" value="{{ editing_rule.id if editing_rule else '' }}">
+        
+        <div class="form-group">
+            <label for="rule_name">نام قانون:</label>
+            <input type="text" name="rule_name" id="rule_name" value="{{ editing_rule.name if editing_rule else '' }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="keywords">کلمات کلیدی (با کاما جدا شوند):</label>
+            <textarea name="keywords" id="keywords" rows="3" required>{{ editing_rule.keywords_str if editing_rule else '' }}</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="response_text">متن پاسخ:</label>
+            <textarea name="response_text" id="response_text" rows="4" required>{{ editing_rule.response_text if editing_rule else '' }}</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="match_type">نوع تطابق:</label>
+            <select name="match_type" id="match_type">
+                <option value="any" {% if editing_rule and editing_rule.match_type == 'any' %}selected{% endif %}>هر کلمه کلیدی (Any Keyword)</option>
+                <option value="exact" {% if editing_rule and editing_rule.match_type == 'exact' %}selected{% endif %}>عبارت دقیق (Exact Phrase - شبیه‌سازی شده)</option>
+                <!-- Add more match types as needed -->
+            </select>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit">{{ 'ذخیره تغییرات' if editing_rule else 'افزودن قانون' }}</button>
+            {% if editing_rule %}
+                <a href="{{ url_for('chatbot_rules_route') }}" style="margin-left: 10px;">لغو ویرایش</a>
             {% endif %}
-        </section>
-    </main>
-</body>
-</html>
+        </div>
+    </form>
+</section>
+
+<section>
+    <h2>لیست قوانین موجود</h2>
+    {% if chatbot_rules_data %}
+    <table>
+        <thead>
+            <tr>
+                <th>نام قانون</th>
+                <th>کلمات کلیدی</th>
+                <th>متن پاسخ (خلاصه)</th>
+                <th>نوع تطابق</th>
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rule in chatbot_rules_data %}
+            <tr>
+                <td>{{ rule.name }}</td>
+                <td>{{ rule.keywords_str }}</td>
+                <td>{{ rule.response_text[:50] }}{% if rule.response_text|length > 50 %}...{% endif %}</td> {# Show snippet #}
+                <td>{{ 'هر کلمه کلیدی' if rule.match_type == 'any' else 'عبارت دقیق' }}</td>
+                <td class="actions">
+                    <a href="{{ url_for('chatbot_rules_route', edit_rule_id=rule.id) }}">ویرایش</a> | 
+                    <a href="#">حذف</a> {# Placeholder for delete action #}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>هنوز هیچ قانون چت‌باتی تعریف نشده است.</p>
+    {% endif %}
+</section>
+{% endblock %}
