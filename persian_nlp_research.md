@@ -152,3 +152,71 @@ Implementing sentiment analysis for Persian text involves several key stages, fr
     *   For a production system, this simulation must be replaced with calls to a robust Persian sentiment analysis model chosen from the approaches described above.
 
 The choice of method depends on accuracy requirements, available resources (labeled data, computational power), and development time. Transformer models from libraries like `DadmaTools` are often the state-of-the-art if readily available and applicable.
+
+## Intent Recognition for Chatbots (Simulated)
+
+Intent recognition is a core component of Natural Language Understanding (NLU) in chatbots, enabling them to understand the user's goal or purpose behind a message, even if the phrasing isn't an exact match to a predefined rule. This makes chatbots more flexible and conversational than purely rule-based systems.
+
+### Role of Intent Recognition
+
+*   **Beyond Keywords:** While basic rules trigger on specific keywords, intent recognition aims to capture the underlying meaning. For example, "سفارشم کی میرسه؟", "وضعیت ارسال چیه؟", and "بسته من کجاست؟" all express the "order_status" intent.
+*   **Handling Variation:** Users express the same need in many different ways. Intent recognition, powered by machine learning, can generalize from training examples to understand varied phrasings.
+*   **Driving Dialogue:** Once an intent is recognized, the chatbot can take appropriate action, like asking for more information (e.g., an order number for "order_status") or providing a specific answer.
+
+### Typical Steps in Intent Recognition
+
+1.  **Preprocessing:**
+    *   Similar to keyword extraction and sentiment analysis, text must be cleaned and prepared.
+    *   **Normalization:** Using `Hazm.Normalizer` for Persian to unify characters, handle spacing, etc.
+    *   **Tokenization:** Breaking text into words (e.g., `Hazm.word_tokenize`) or sub-word units.
+    *   **Lemmatization/Stemming (Optional, model-dependent):** Reducing words to their base form can help generalize, especially for traditional ML models. `Hazm.Lemmatizer` is suitable. Some advanced models (like transformers) might perform better with less aggressive stemming.
+    *   **Stop Word Removal (Optional, model-dependent):** May or may not be beneficial depending on the model.
+
+2.  **Feature Extraction:**
+    *   Converting the preprocessed text into a numerical representation that machine learning models can understand.
+    *   **TF-IDF (Term Frequency-Inverse Document Frequency):** Represents text based on the importance of words.
+    *   **Word Embeddings (e.g., Word2Vec, FastText, or from Transformers like ParsBERT):** Captures semantic meaning and relationships between words. These are often more powerful. `DadmaTools` might provide access to Persian embeddings or facilitate their use with transformer models.
+
+3.  **Model Training or Usage:**
+    *   **Training Data:** A dataset of user utterances labeled with their corresponding intents is required (e.g., "سفارشم کی میرسه؟" -> "order_status").
+    *   **Machine Learning Models:**
+        *   **Traditional Classifiers:** SVMs, Logistic Regression, Naive Bayes can be trained on TF-IDF features.
+        *   **Deep Learning Models:** CNNs, LSTMs, or more commonly, Transformer-based models (like BERT, RoBERTa, ALBERT fine-tuned for Persian) achieve state-of-the-art results. Libraries like `DadmaTools` may provide pre-trained Persian models that can be fine-tuned for intent classification.
+        *   **NLU Frameworks:** Tools like **Rasa NLU** provide a complete framework for building intent recognition and entity extraction components. They often include pipelines for multiple languages and allow integration of custom components or pre-trained models.
+    *   **Pre-trained Models:** If available, pre-trained intent recognition models for Persian can significantly speed up development, though they might need fine-tuning for specific domains.
+
+4.  **Entity Extraction (Often coupled with Intent Recognition):**
+    *   While intent recognition identifies the user's goal, entity extraction identifies specific pieces of information within the user's message.
+    *   For example, if the intent is "order_status", entities might include "order_number" or "date".
+    *   Recognizing entities is crucial for fulfilling the intent (e.g., "برای پیگیری وضعیت سفارش، لطفا شماره سفارش خود را وارد کنید." – the chatbot needs to extract the order number from the user's next message).
+    *   Libraries like `Hazm` (for basic chunking/NER) or transformer models from `DadmaTools` (for more advanced NER) can be used. Rasa NLU also has strong entity extraction capabilities.
+
+### Simulation in `ChatbotService`
+
+*   The `_simulate_intent_recognition` method in `ChatbotService` uses a **highly simplified keyword-spotting approach**. It defines intents with lists of associated keywords ("all_of", "any_of").
+*   This simulation **does not involve any machine learning, feature extraction, or true NLP model training**. It's a placeholder to demonstrate where intent logic would fit into the chatbot's workflow.
+*   **Limitations of Simulation:**
+    *   Cannot handle variations in phrasing well.
+    *   Not robust to typos or grammatical differences.
+    *   Does not learn from new examples.
+    *   Keyword lists need manual maintenance and can become complex to manage for many intents.
+*   For a production-grade chatbot, this simulation must be replaced with a proper NLU pipeline leveraging the NLP libraries and techniques discussed above (e.g., Hazm for preprocessing, potentially DadmaTools or Rasa NLU for intent classification and entity extraction).
+
+### Dialog Management Considerations
+
+While intent recognition and entity extraction help in understanding a single user message, many useful chatbot interactions require multiple turns of conversation. This is where **Dialog Management** becomes crucial.
+
+*   **Tracking Context:** Dialog management systems are responsible for tracking the conversation's state and context over time. This includes remembering previous user inputs, chatbot responses, and any information gathered (entities).
+*   **Guiding Conversations:** Based on the current state and recognized intent, the dialog manager decides the chatbot's next action. This could be:
+    *   Asking a clarifying question.
+    *   Requesting missing information (e.g., asking for an order number after an "order_status" intent).
+    *   Providing the final answer or performing an action once all necessary information is gathered.
+    *   Handling unexpected user responses or changes in topic.
+*   **Stateful Interactions:** This allows the chatbot to move beyond simple single-shot question-answering and engage in more complex, goal-oriented interactions like booking appointments, troubleshooting issues, or processing orders step-by-step.
+*   **Implementation Approaches:**
+    *   **Simple State Machines:** For basic dialogs, a state machine can be explicitly coded.
+    *   **Rule-Based Systems:** More complex rules can define conversation flows.
+    *   **Statistical/Reinforcement Learning Models:** Advanced dialog managers can be trained using machine learning (e.g., Rasa Core uses an ML-based approach to learn dialog policies).
+*   **Conceptual Notes:** For initial considerations on how dialog management could be integrated into the current project structure, refer to the `_conceptual_dialog_management_notes()` method within `chatbot_service.py`. These notes outline basic ideas for state storage (e.g., using a database table like `ConversationState`) and state transition logic that would be necessary to build multi-turn capabilities.
+
+Effectively managing dialog state is key to creating a chatbot that feels coherent and can successfully complete tasks that require more than one user-bot exchange.

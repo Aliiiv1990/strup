@@ -24,20 +24,36 @@ app.config['WHATSAPP_VERIFY_TOKEN'] = WHATSAPP_VERIFY_TOKEN
 app.config['WHATSAPP_APP_SECRET'] = WHATSAPP_APP_SECRET
 
 
-# --- Placeholder Chatbot Processor ---
-def _placeholder_chatbot_processor(db_session, received_message_log_entry: ReceivedMessageLog):
-    """
-    Placeholder function to simulate passing data to a chatbot service.
-    This will be replaced by a call to the actual chatbot service later.
-    """
-    print(f"[Chatbot Placeholder] Received message for processing:")
-    print(f"  Log ID: {received_message_log_entry.id}")
-    print(f"  From: {received_message_log_entry.sender_whatsapp_id}")
-    print(f"  Type: {received_message_log_entry.message_type}")
-    print(f"  Text: {received_message_log_entry.message_body_text}")
-    # In a real scenario, this function would trigger chatbot logic,
-    # potentially interact with WhatsAppService to send replies, etc.
+# --- Service Initialization ---
+from whatsapp_service import WhatsAppService
+from chatbot_service import ChatbotService
+# Assuming database_setup.get_db_session is already imported
 
+# Configurations for services
+# WHATSAPP_APP_SECRET from app.config will be used as API token by WhatsAppService via ChatbotService integration.
+# WHATSAPP_PHONE_NUMBER_ID needs to be consistently defined, e.g., from environment.
+# For simplicity, webhook_handler.py now directly uses os.getenv for these,
+# matching the pattern in the modified WhatsAppService.
+
+WHATSAPP_API_TOKEN_CONFIG = os.getenv("WHATSAPP_API_TOKEN", app.config.get('WHATSAPP_APP_SECRET')) # Use App Secret as token if not specified
+WHATSAPP_PHONE_NUMBER_ID_CONFIG = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "dummy_phone_id_webhook")
+
+if WHATSAPP_API_TOKEN_CONFIG == "my_dummy_app_secret" or WHATSAPP_PHONE_NUMBER_ID_CONFIG == "dummy_phone_id_webhook":
+    print("Warning: Using dummy values for WHATSAPP_API_TOKEN or WHATSAPP_PHONE_NUMBER_ID in webhook_handler.")
+
+db_session_factory = get_db_session
+
+whatsapp_service_instance = WhatsAppService(
+    token=WHATSAPP_API_TOKEN_CONFIG,
+    phone_number_id=WHATSAPP_PHONE_NUMBER_ID_CONFIG,
+    db_session_factory=db_session_factory
+)
+
+chatbot_service_instance = ChatbotService(
+    whatsapp_service=whatsapp_service_instance,
+    db_session_factory=db_session_factory
+)
+print("WhatsAppService and ChatbotService initialized globally in webhook_handler.")
 
 # --- Webhook Routes ---
 @app.route('/webhook', methods=['GET', 'POST'])
@@ -172,8 +188,18 @@ def webhook_listener():
                                     
                                     print(f"Message from {sender_wa_id} logged to ReceivedMessageLog (ID: {log_entry.id}). Type: {message_type}")
 
-                                    # Pass to Chatbot (Placeholder)
-                                    _placeholder_chatbot_processor(db, log_entry)
+                                    # Pass to ChatbotService for processing
+                                    # chatbot_service_instance is globally available now
+                                    try:
+                                        # The log_entry object is an SQLAlchemy model instance from the current 'db' session.
+                                        # ChatbotService.process_message uses its own session factory for its operations,
+                                        # including calls to WhatsAppService for sending replies and logging them.
+                                        # This is fine as long as process_message doesn't try to modify log_entry
+                                        # and commit it using a *different* session. It primarily reads from log_entry.
+                                        chatbot_service_instance.process_message(log_entry)
+                                    except Exception as e_chatbot:
+                                        print(f"Error calling ChatbotService: {e_chatbot}")
+                                        # Log this error, but don't abort the 200 OK to WhatsApp
                             
                             # Handle other types of notifications if necessary (e.g., message status updates)
                             # These would be under `value.get("statuses")`
