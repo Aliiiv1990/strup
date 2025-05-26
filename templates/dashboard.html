@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - WhatsApp Platform</title>
+    <!-- Link to a style.css, which will be in the static folder -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Basic inline styles for structure if style.css is not loaded */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; }
+        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
+        nav h1 { margin: 0; }
+        nav ul { list-style-type: none; padding: 0; }
+        nav ul li { display: inline; margin: 0 15px; }
+        nav ul li a { color: white; text-decoration: none; }
+        main { padding: 20px; }
+        h1, h2 { color: #333; }
+        section { background-color: white; margin-bottom: 20px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-item { margin-bottom: 10px; }
+        .stat-item strong { color: #555; }
+        #quick-actions button {
+            background-color: #007bff; color: white; border: none; padding: 10px 15px;
+            margin-right: 10px; border-radius: 5px; cursor: pointer; font-size: 1em;
+        }
+        #quick-actions button:hover { background-color: #0056b3; }
+        .chart-placeholder {
+            border: 1px solid #ddd; padding: 50px; text-align: center; color: #777;
+            background-color: #fafafa; border-radius: 5px; margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <nav> <!-- Placeholder for navigation, to be developed in base.html later -->
+        <h1>پلتفرم واتساپ (WhatsApp Platform)</h1>
+        <ul>
+            <li><a href="{{ url_for('dashboard_route') }}">داشبورد (Dashboard)</a></li>
+            <!-- Other nav links will be added later -->
+            <li><a href="{{ url_for('ui_test') }}">صفحه تست UI (UI Test Page)</a></li>
+        </ul>
+    </nav>
+    <main>
+        <h1>داشبورد مدیریتی</h1>
+        
+        <section id="summary-stats">
+            <h2>آمار کلی</h2>
+            <div class="stat-item"><strong>تعداد کل مخاطبین:</strong> {{ stats.total_contacts }}</div>
+            <div class="stat-item"><strong>ارسال‌های زمان‌بندی شده (امروز):</strong> {{ stats.scheduled_today }}</div>
+            <div class="stat-item"><strong>پیام‌های دریافتی (امروز):</strong> {{ stats.received_today }}</div>
+            <div class="stat-item"><strong>پیام‌های ارسال شده (امروز):</strong> {{ stats.sent_today }}</div>
+        </section>
+        
+        <section id="quick-actions">
+            <h2>دسترسی سریع</h2>
+            <button>زمان‌بندی ارسال جدید</button>
+            <button>افزودن مخاطب جدید</button>
+        </section>
+        
+        <section id="charts">
+            <h2>روند پیام‌ها</h2>
+            <div class="chart-placeholder">[نمودار روند پیام‌ها - در آینده اضافه خواهد شد]</div>
+        </section>
+    </main>
+</body>
+</html>

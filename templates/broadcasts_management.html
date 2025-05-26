@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>مدیریت ارسال‌های گروهی - پلتفرم واتساپ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Basic inline styles for structure if style.css is not loaded */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; direction: rtl; }
+        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
+        nav h1 { margin: 0; }
+        nav ul { list-style-type: none; padding: 0; }
+        nav ul li { display: inline; margin: 0 15px; }
+        nav ul li a { color: white; text-decoration: none; }
+        main { padding: 20px; }
+        h1 { color: #333; text-align: right; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        th { background-color: #f0f0f0; }
+        .actions a { margin-left: 10px; text-decoration: none; color: #007bff; }
+        .actions a:hover { text-decoration: underline; }
+        .create-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .create-button:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+    <nav> <!-- Placeholder for navigation -->
+        <h1>پلتفرم واتساپ</h1>
+        <ul>
+            <li><a href="{{ url_for('dashboard_route') }}">داشبورد</a></li>
+            <li><a href="{{ url_for('contact_lists_route') }}">مخاطبین</a></li>
+            <li><a href="{{ url_for('broadcasts_route') }}">ارسال‌های گروهی</a></li>
+            <!-- Other nav links will be added later -->
+        </ul>
+    </nav>
+    <main>
+        <h1>مدیریت ارسال‌های گروهی</h1>
+        <a href="{{ url_for('schedule_broadcast_form_route') }}" class="create-button">زمان‌بندی ارسال گروهی جدید</a>
+        
+        {% if broadcasts_data %}
+        <table>
+            <thead>
+                <tr>
+                    <th>محتوای پیام (خلاصه)</th>
+                    <th>لیست(های) هدف</th>
+                    <th>زمان ارسال</th>
+                    <th>وضعیت</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for broadcast in broadcasts_data %}
+                <tr>
+                    <td>{{ broadcast.message_snippet }}</td>
+                    <td>{{ broadcast.target_lists }}</td>
+                    <td>{{ broadcast.scheduled_time }}</td>
+                    <td>{{ broadcast.status }}</td>
+                    <td class="actions">
+                        <a href="#">مشاهده</a> | 
+                        <a href="#">ویرایش</a> | 
+                        <a href="#">حذف</a> |
+                        <a href="#">کپی</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>هنوز هیچ ارسال گروهی زمان‌بندی نشده است.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

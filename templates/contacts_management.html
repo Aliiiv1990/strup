@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>مدیریت لیست مخاطبین - پلتفرم واتساپ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Basic inline styles for structure if style.css is not loaded */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; direction: rtl; }
+        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
+        nav h1 { margin: 0; }
+        nav ul { list-style-type: none; padding: 0; }
+        nav ul li { display: inline; margin: 0 15px; }
+        nav ul li a { color: white; text-decoration: none; }
+        main { padding: 20px; }
+        h1, h2 { color: #333; text-align: right; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        th { background-color: #f0f0f0; }
+        .actions a { margin-left: 10px; text-decoration: none; color: #007bff; }
+        .actions a:hover { text-decoration: underline; }
+        .create-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .create-button:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+    <nav> <!-- Placeholder for navigation, to be developed in base.html later -->
+        <h1>پلتفرم واتساپ</h1>
+        <ul>
+            <li><a href="{{ url_for('dashboard_route') }}">داشبورد</a></li>
+            <li><a href="{{ url_for('contact_lists_route') }}">مخاطبین</a></li>
+            <!-- Other nav links will be added later -->
+        </ul>
+    </nav>
+    <main>
+        <h1>مدیریت لیست مخاطبین</h1>
+        <a href="{{ url_for('new_contact_list_form_route') }}" class="create-button">ایجاد لیست مخاطبین جدید</a>
+        
+        {% if contact_lists %}
+        <table>
+            <thead>
+                <tr>
+                    <th>نام لیست</th>
+                    <th>تعداد مخاطبین</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cl_list in contact_lists %}
+                <tr>
+                    <td>{{ cl_list.name }}</td>
+                    <td>{{ cl_list.contact_count }}</td>
+                    <td class="actions">
+                        <a href="{{ url_for('contact_list_detail_route', list_id=cl_list.id) }}">مشاهده مخاطبین</a> |
+                        <a href="#">ویرایش نام</a> | 
+                        <a href="#">حذف</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>هنوز هیچ لیست مخاطبی ایجاد نشده است.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

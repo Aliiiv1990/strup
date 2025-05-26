@@ -1,0 +1,159 @@
+/* Basic styles for the WhatsApp Platform UI */
+
+body { 
+    font-family: 'Helvetica Neue', Arial, sans-serif; 
+    margin: 0; 
+    padding: 0; 
+    background-color: #f8f9fa; /* Light grey background */
+    color: #212529; /* Dark grey text */
+    line-height: 1.6;
+}
+
+nav { 
+    background-color: #343a40; /* Dark Bootstrap-like navbar */
+    color: white; 
+    padding: 0.8em 1.5em; 
+    text-align: center; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+nav h1 { 
+    margin: 0; 
+    font-size: 1.5em;
+    font-weight: 500;
+}
+
+nav ul { 
+    list-style-type: none; 
+    padding: 0; 
+    margin-top: 5px;
+}
+
+nav ul li { 
+    display: inline; 
+    margin: 0 12px; 
+}
+
+nav ul li a { 
+    color: #adb5bd; /* Lighter text for nav links */
+    text-decoration: none; 
+    font-size: 0.95em;
+}
+nav ul li a:hover, nav ul li a.active {
+    color: #ffffff; /* White on hover/active */
+}
+
+main { 
+    padding: 25px; 
+    max-width: 1200px; /* Max width for content area */
+    margin: 20px auto; /* Center content */
+}
+
+h1 {
+    font-size: 2em;
+    color: #343a40;
+    margin-bottom: 0.8em;
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 0.3em;
+}
+
+h2 { 
+    font-size: 1.6em;
+    color: #495057; /* Slightly lighter than h1 */
+    margin-top: 1.5em;
+    margin-bottom: 0.7em;
+}
+
+section { 
+    background-color: #ffffff; 
+    margin-bottom: 25px; 
+    padding: 25px; 
+    border-radius: 8px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.stat-item { 
+    margin-bottom: 12px; 
+    font-size: 1.05em;
+}
+
+.stat-item strong { 
+    color: #343a40; 
+    margin-right: 8px;
+}
+
+#quick-actions button {
+    background-color: #007bff; /* Primary blue */
+    color: white; 
+    border: none; 
+    padding: 12px 18px;
+    margin-right: 12px; 
+    border-radius: 5px; 
+    cursor: pointer; 
+    font-size: 1em;
+    transition: background-color 0.2s ease-in-out;
+}
+
+#quick-actions button:hover { 
+    background-color: #0056b3; /* Darker blue */
+}
+
+.chart-placeholder { 
+    border: 1px dashed #ced4da; /* Dashed border */
+    padding: 60px; 
+    text-align: center; 
+    color: #6c757d; /* Muted text color */
+    background-color: #f8f9fa; 
+    border-radius: 5px; 
+    margin-top: 15px;
+    font-style: italic;
+}
+
+/* Basic table styling (for future views) */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+th, td {
+    text-align: right; /* Changed to right for Persian */
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+th {
+    background-color: #e9ecef;
+    font-weight: 600;
+}
+
+/* Basic form styling (for future views) */
+input[type="text"], input[type="password"], input[type="email"], textarea, select {
+    width: calc(100% - 22px); /* Full width minus padding */
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button[type="submit"] {
+    background-color: #28a745; /* Green for submit */
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button[type="submit"]:hover {
+    background-color: #218838; /* Darker green */
+}
+
+/* Utility classes */
+.text-center {
+    text-align: center;
+}
+.mt-1 { margin-top: 0.5rem; }
+.mb-1 { margin-bottom: 0.5rem; }
+/* Add more as needed */

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ form_title }} - پلتفرم واتساپ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; direction: rtl; }
+        nav { background-color: #333; color: white; padding: 1em; text-align: center; }
+        nav h1 { margin: 0; }
+        nav ul { list-style-type: none; padding: 0; }
+        nav ul li { display: inline; margin: 0 15px; }
+        nav ul li a { color: white; text-decoration: none; }
+        main { padding: 20px; max-width: 600px; margin: 20px auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: right; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; text-align: right; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input[type="text"] {
+            width: calc(100% - 22px); /* Adjust for padding and border */
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-actions button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .form-actions button:hover { background-color: #218838; }
+        .form-actions a {
+            margin-right: 10px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .form-actions a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <nav> <!-- Placeholder for navigation -->
+        <h1>پلتفرم واتساپ</h1>
+        <ul>
+            <li><a href="{{ url_for('dashboard_route') }}">داشبورد</a></li>
+            <li><a href="{{ url_for('contact_lists_route') }}">مخاطبین</a></li>
+        </ul>
+    </nav>
+    <main>
+        <h1>{{ form_title }}</h1>
+        <form method="POST" action="{{ form_action_url }}">
+            <div class="form-group">
+                <label for="list_name">نام لیست:</label>
+                <input type="text" id="list_name" name="list_name" value="{{ list.name if list else '' }}" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit">ذخیره</button>
+                <a href="{{ url_for('contact_lists_route') }}">انصراف</a>
+            </div>
+        </form>
+    </main>
+</body>
+</html>
