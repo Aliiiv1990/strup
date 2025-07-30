@@ -18,9 +18,9 @@ const getContactInfo = (jid, sock) => {
 
 const sanitizeFilename = (str, maxLength = 50) => {
     if (!str) return '';
+    // Remove invalid Windows filename characters and replace whitespace with underscores
     const sanitized = str.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_');
-    const final = sanitized.replace(/[^a-zA-Z0-9_]/g, '');
-    return final.substring(0, maxLength);
+    return sanitized.substring(0, maxLength);
 };
 
 async function connectToWhatsApp() {
@@ -85,60 +85,58 @@ async function connectToWhatsApp() {
 }
 
 async function processStatusMessage(m, sock) {
-    // Handle both live and historical status updates
-    const senderJid = m.participant || m.key.participant;
-    if (!senderJid) {
-        console.log('Could not determine sender for status update, skipping.');
-        return;
-    }
-
-    const { name, phone } = getContactInfo(senderJid, sock);
-    const shortId = m.key.id.substring(0, 8);
-    console.log(`Processing status from: ${name} (${phone}) - ID: ${shortId}`);
-
-    let filename;
-    let buffer;
-
-    if (m.message?.imageMessage) {
-        console.log('Status is an image.');
-        const caption = m.message.imageMessage.caption || '';
-        const sanitizedCaption = sanitizeFilename(caption);
-        filename = `downloads/${name}_${phone}_${shortId}_${sanitizedCaption}.jpg`;
-
-        const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
-        buffer = Buffer.from([]);
-        for await (const chunk of stream) {
-            buffer = Buffer.concat([buffer, chunk]);
+    try {
+        // Handle both live and historical status updates
+        const senderJid = m.participant || m.key.participant;
+        if (!senderJid) {
+            // This case should ideally not happen for a status, but as a safeguard:
+            console.log(`Could not determine sender for status update with ID: ${m.key.id}, skipping.`);
+            return;
         }
-    } else if (m.message?.videoMessage) {
-        console.log('Status is a video, skipping as requested.');
-        return;
-    } else if (m.message?.extendedTextMessage?.text) {
-        console.log('Status is text-only.');
-        const text = m.message.extendedTextMessage.text;
-        filename = `downloads/${name}_${phone}_${shortId}.txt`;
 
-        try {
+        const { name, phone } = getContactInfo(senderJid, sock);
+        const shortId = m.key.id.substring(0, 8);
+        console.log(`Processing status from: ${name} (${phone}) - ID: ${shortId}`);
+
+        let filename;
+        let buffer;
+
+        if (m.message?.imageMessage) {
+            console.log('Status is an image.');
+            const caption = m.message.imageMessage.caption || '';
+            const sanitizedCaption = sanitizeFilename(caption);
+            const sanitizedName = sanitizeFilename(name);
+            filename = `downloads/${sanitizedName}_${shortId}_${sanitizedCaption}.jpg`;
+
+            const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
+            buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
+        } else if (m.message?.videoMessage) {
+            console.log('Status is a video, skipping as requested.');
+            return;
+        } else if (m.message?.extendedTextMessage?.text) {
+            console.log('Status is text-only.');
+            const text = m.message.extendedTextMessage.text;
+            const sanitizedName = sanitizeFilename(name);
+            filename = `downloads/${sanitizedName}_${shortId}.txt`;
+
             fs.writeFileSync(filename, text);
             console.log(`Successfully saved text status from ${name} to ${filename}`);
-        } catch (err) {
-            console.error('Failed to save text status:', err);
+            return; // End processing for text
         }
-        return;
-    }
-    else {
-        console.log('Status is not an image or text, skipping.');
-        return;
-    }
+        else {
+            console.log('Status is not an image or text, skipping.');
+            return;
+        }
 
-    if (buffer && filename) {
-        fs.writeFile(filename, buffer, (err) => {
-            if (err) {
-                console.error('Failed to save status media:', err);
-            } else {
-                console.log(`Successfully downloaded status from ${name} to ${filename}`);
-            }
-        });
+        if (buffer && filename) {
+            fs.writeFileSync(filename, buffer);
+            console.log(`Successfully downloaded status from ${name} to ${filename}`);
+        }
+    } catch (error) {
+        console.error(`Failed to process status with ID ${m.key.id}. Error: ${error.message}`);
     }
 }
 
