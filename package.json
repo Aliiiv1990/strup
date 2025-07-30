@@ -1,0 +1,13 @@
+{
+  "name": "whatsapp-status-downloader",
+  "version": "1.0.0",
+  "description": "A simple app to download WhatsApp statuses.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "pino": "latest"
+  }
+}
