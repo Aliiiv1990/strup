@@ -57,7 +57,7 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log('WhatsApp connection opened successfully.');
             console.log('Fetching active statuses...');
-            await sock.sendReadReceipt('status@broadcast', undefined, []);
+            await sock.sendReceipt('status@broadcast', undefined, [], 'read');
         }
     });
 
