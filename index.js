@@ -59,7 +59,8 @@ async function connectToWhatsApp() {
             }
         } else if (connection === 'open') {
             console.log('WhatsApp connection opened successfully.');
-            console.log('Syncing full history to get all active statuses...');
+            console.log('Forcing a full app state sync to get all active statuses...');
+            await sock.resyncAppState(['critical_unblock_low']);
         }
     });
 
@@ -81,7 +82,8 @@ async function processStatusMessage(m, sock) {
     }
 
     const { name, phone } = getContactInfo(senderJid, sock);
-    console.log(`Processing status from: ${name} (${phone})`);
+    const shortId = m.key.id.substring(0, 8);
+    console.log(`Processing status from: ${name} (${phone}) - ID: ${shortId}`);
 
     let filename;
     let buffer;
@@ -90,7 +92,7 @@ async function processStatusMessage(m, sock) {
         console.log('Status is an image.');
         const caption = m.message.imageMessage.caption || '';
         const sanitizedCaption = sanitizeFilename(caption);
-        filename = `downloads/${name}_${phone}_${sanitizedCaption}.jpg`;
+        filename = `downloads/${name}_${phone}_${shortId}_${sanitizedCaption}.jpg`;
 
         const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
         buffer = Buffer.from([]);
@@ -103,15 +105,14 @@ async function processStatusMessage(m, sock) {
     } else if (m.message?.extendedTextMessage?.text) {
         console.log('Status is text-only.');
         const text = m.message.extendedTextMessage.text;
-        filename = `downloads/${name}_${phone}_${m.messageTimestamp}.txt`;
+        filename = `downloads/${name}_${phone}_${shortId}.txt`;
 
-        fs.writeFile(filename, text, (err) => {
-            if (err) {
-                console.error('Failed to save text status:', err);
-            } else {
-                console.log(`Successfully saved text status from ${name} to ${filename}`);
-            }
-        });
+        try {
+            fs.writeFileSync(filename, text);
+            console.log(`Successfully saved text status from ${name} to ${filename}`);
+        } catch (err) {
+            console.error('Failed to save text status:', err);
+        }
         return;
     }
     else {
