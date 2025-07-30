@@ -11,7 +11,6 @@ const logger = pino({ level: 'silent' });
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
-    // Use saved name, push name, or just the phone number
     const name = contact?.name || contact?.notify || jid.split('@')[0];
     const phone = jid.split('@')[0];
     return { name, phone };
@@ -19,9 +18,7 @@ const getContactInfo = (jid, sock) => {
 
 const sanitizeFilename = (str, maxLength = 50) => {
     if (!str) return '';
-    // Remove invalid characters for Windows filenames, replace spaces with underscores
     const sanitized = str.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_');
-    // Keep only English alphanumeric, numbers, and underscores
     const final = sanitized.replace(/[^a-zA-Z0-9_]/g, '');
     return final.substring(0, maxLength);
 };
@@ -31,11 +28,9 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        // The printQRInTerminal option is removed as it's deprecated.
         logger: logger,
     });
 
-    // Store contacts
     sock.ev.on('contacts.upsert', (contacts) => {
         sock.contacts = sock.contacts || {};
         for (const contact of contacts) {
@@ -45,11 +40,11 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            qrcode.generate(qr, { small: true }); // This line now prints the QR code
+            qrcode.generate(qr, { small: true });
             console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
         }
 
@@ -61,7 +56,6 @@ async function connectToWhatsApp() {
             }
         } else if (connection === 'open') {
             console.log('WhatsApp connection opened successfully.');
-            // Fetching all active statuses on startup
             console.log('Fetching active statuses...');
             await sock.sendReadReceipt('status@broadcast', undefined, []);
         }
@@ -69,7 +63,6 @@ async function connectToWhatsApp() {
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
         for (const m of messages) {
-            // Process any incoming status message
             if (m.key.remoteJid === 'status@broadcast') {
                 await processStatusMessage(m, sock);
             }
@@ -78,7 +71,6 @@ async function connectToWhatsApp() {
 }
 
 async function processStatusMessage(m, sock) {
-    // Correctly get the sender's JID for statuses
     const senderJid = m.participant;
     if (!senderJid) {
         console.log('Could not determine sender for status update, skipping.');
@@ -117,7 +109,7 @@ async function processStatusMessage(m, sock) {
                 console.log(`Successfully saved text status from ${name} to ${filename}`);
             }
         });
-        return; // End processing for text messages here
+        return;
     }
     else {
         console.log('Status is not an image or text, skipping.');
