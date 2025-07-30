@@ -59,8 +59,7 @@ async function connectToWhatsApp() {
             }
         } else if (connection === 'open') {
             console.log('WhatsApp connection opened successfully.');
-            console.log('Forcing a full app state sync to get all active statuses...');
-            await sock.resyncAppState(['critical_unblock_low']);
+            console.log('Waiting for history sync to get all active statuses...');
         }
     });
 
@@ -70,6 +69,18 @@ async function connectToWhatsApp() {
                 await processStatusMessage(m, sock);
             }
         }
+    });
+
+    sock.ev.on('messaging-history.set', async ({ messages }) => {
+        console.log(`Received ${messages.length} messages from history sync.`);
+        for (const m of messages) {
+            if (m.key.remoteJid === 'status@broadcast') {
+                // Use a small delay to prevent rate limiting or overwhelming the file system
+                await new Promise(resolve => setTimeout(resolve, 200));
+                await processStatusMessage(m, sock);
+            }
+        }
+        console.log('Finished processing history sync.');
     });
 }
 
