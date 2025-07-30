@@ -73,7 +73,8 @@ async function connectToWhatsApp() {
 }
 
 async function processStatusMessage(m, sock) {
-    const senderJid = m.participant;
+    // Handle both live and historical status updates
+    const senderJid = m.participant || m.key.participant;
     if (!senderJid) {
         console.log('Could not determine sender for status update, skipping.');
         return;
