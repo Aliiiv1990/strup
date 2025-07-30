@@ -1,8 +1,8 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
+const qrcode = require('qrcode-terminal');
 
-// Create a directory for downloads if it doesn't exist
 if (!fs.existsSync('./downloads')){
     fs.mkdirSync('./downloads');
 }
@@ -14,7 +14,7 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
+        // The printQRInTerminal option is removed as it's deprecated.
         logger: logger,
     });
 
@@ -24,6 +24,7 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
+            qrcode.generate(qr, { small: true }); // This line now prints the QR code
             console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
         }
 
