@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Status Downloader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>WhatsApp Status Downloader</h1>
+    <div id="connection-status">
+        <p>Status: <span id="status-text">Initializing...</span></p>
+    </div>
+    <div id="qr-container">
+        <p>Please scan the QR code to connect.</p>
+        <img id="qr-image" src="" alt="QR Code" />
+    </div>
+    <div id="gallery">
+        <h2>Downloaded Statuses</h2>
+        <div id="statuses-container"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>

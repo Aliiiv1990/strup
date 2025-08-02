@@ -1,13 +1,61 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
-const qrcode = require('qrcode-terminal');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const qrcode = require('qrcode');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
 
 if (!fs.existsSync('./downloads')){
     fs.mkdirSync('./downloads');
 }
 
 const logger = pino({ level: 'silent' });
+
+// Store the latest connection state
+let connectionState = {
+    status: 'Initializing...',
+    qr: null,
+};
+
+io.on('connection', (socket) => {
+    console.log('A user connected');
+    // Immediately send the current state to the new client
+    socket.emit('status', connectionState.status);
+    if (connectionState.qr) {
+        socket.emit('qr', connectionState.qr);
+    }
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected');
+    });
+});
+
+app.get('/statuses', (req, res) => {
+    fs.readdir('./downloads', (err, files) => {
+        if (err) {
+            return res.status(500).send('Error reading statuses directory');
+        }
+        const statuses = files.map(file => {
+            const filePath = path.join(__dirname, 'downloads', file);
+            if (file.endsWith('.txt')) {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                return { type: 'text', content: content, name: path.basename(file, '.txt').replace(/_/g, ' ') };
+            } else {
+                return { type: 'image', path: `/downloads/${file}`, name: path.basename(file, '.jpg').replace(/_/g, ' ') };
+            }
+        }).reverse(); // Show newest first
+        res.json(statuses);
+    });
+});
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
@@ -18,27 +66,18 @@ const getContactInfo = (jid, sock) => {
 
 const sanitizeFilename = (str, maxLength = 50) => {
     if (!str) return '';
-    // Remove invalid Windows filename characters and replace whitespace with underscores
     const sanitized = str.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_');
     return sanitized.substring(0, maxLength);
 };
 
-async function connectToWhatsApp() {
+async function connectToWhatsApp(io_instance) {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
         logger: logger,
-        // Implement the full history sync
         browser: Browsers.macOS('Desktop'),
         syncFullHistory: true,
-    });
-
-    sock.ev.on('contacts.upsert', (contacts) => {
-        sock.contacts = sock.contacts || {};
-        for (const contact of contacts) {
-            sock.contacts[contact.id] = contact;
-        }
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -47,26 +86,33 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            qrcode.generate(qr, { small: true });
-            console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
+            connectionState.status = 'QR Code';
+            connectionState.qr = await qrcode.toDataURL(qr);
+            io_instance.emit('status', connectionState.status);
+            io_instance.emit('qr', connectionState.qr);
+            console.log('QR code updated and sent to clients.');
         }
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            connectionState.status = `Connection closed. Reconnecting: ${shouldReconnect}`;
+            io_instance.emit('status', connectionState.status);
             console.log('Connection closed, reconnecting:', shouldReconnect);
             if (shouldReconnect) {
-                connectToWhatsApp();
+                connectToWhatsApp(io_instance);
             }
         } else if (connection === 'open') {
+            connectionState.status = 'Connected';
+            connectionState.qr = null; // QR is no longer needed
+            io_instance.emit('status', connectionState.status);
             console.log('WhatsApp connection opened successfully.');
-            console.log('Waiting for history sync to get all active statuses...');
         }
     });
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
         for (const m of messages) {
             if (m.key.remoteJid === 'status@broadcast') {
-                await processStatusMessage(m, sock);
+                await processStatusMessage(m, sock, io_instance);
             }
         }
     });
@@ -75,69 +121,61 @@ async function connectToWhatsApp() {
         console.log(`Received ${messages.length} messages from history sync.`);
         for (const m of messages) {
             if (m.key.remoteJid === 'status@broadcast') {
-                // Use a small delay to prevent rate limiting or overwhelming the file system
                 await new Promise(resolve => setTimeout(resolve, 200));
-                await processStatusMessage(m, sock);
+                await processStatusMessage(m, sock, io_instance);
             }
         }
         console.log('Finished processing history sync.');
     });
 }
 
-async function processStatusMessage(m, sock) {
+async function processStatusMessage(m, sock, io_instance) {
     try {
-        // Handle both live and historical status updates
         const senderJid = m.participant || m.key.participant;
-        if (!senderJid) {
-            // This case should ideally not happen for a status, but as a safeguard:
-            console.log(`Could not determine sender for status update with ID: ${m.key.id}, skipping.`);
-            return;
-        }
+        if (!senderJid) return;
 
-        const { name, phone } = getContactInfo(senderJid, sock);
+        const { name } = getContactInfo(senderJid, sock);
         const shortId = m.key.id.substring(0, 8);
-        console.log(`Processing status from: ${name} (${phone}) - ID: ${shortId}`);
 
-        let filename;
-        let buffer;
+        let newStatus = null;
 
         if (m.message?.imageMessage) {
-            console.log('Status is an image.');
             const caption = m.message.imageMessage.caption || '';
             const sanitizedCaption = sanitizeFilename(caption);
             const sanitizedName = sanitizeFilename(name);
-            filename = `downloads/${sanitizedName}_${shortId}_${sanitizedCaption}.jpg`;
+            const filename = `${sanitizedName}_${shortId}_${sanitizedCaption}.jpg`;
+            const filepath = path.join(__dirname, 'downloads', filename);
 
             const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
-            buffer = Buffer.from([]);
+            let buffer = Buffer.from([]);
             for await (const chunk of stream) {
                 buffer = Buffer.concat([buffer, chunk]);
             }
-        } else if (m.message?.videoMessage) {
-            console.log('Status is a video, skipping as requested.');
-            return;
+            fs.writeFileSync(filepath, buffer);
+            console.log(`Downloaded image from ${name} to ${filename}`);
+            newStatus = { type: 'image', path: `/downloads/${filename}`, name: `${name} - ${caption}` };
         } else if (m.message?.extendedTextMessage?.text) {
-            console.log('Status is text-only.');
             const text = m.message.extendedTextMessage.text;
             const sanitizedName = sanitizeFilename(name);
-            filename = `downloads/${sanitizedName}_${shortId}.txt`;
+            const filename = `${sanitizedName}_${shortId}.txt`;
+            const filepath = path.join(__dirname, 'downloads', filename);
 
-            fs.writeFileSync(filename, text);
-            console.log(`Successfully saved text status from ${name} to ${filename}`);
-            return; // End processing for text
-        }
-        else {
-            console.log('Status is not an image or text, skipping.');
-            return;
+            fs.writeFileSync(filepath, text);
+            console.log(`Saved text status from ${name} to ${filename}`);
+            newStatus = { type: 'text', content: text, name: `${name}` };
         }
 
-        if (buffer && filename) {
-            fs.writeFileSync(filename, buffer);
-            console.log(`Successfully downloaded status from ${name} to ${filename}`);
+        if (newStatus) {
+            io_instance.emit('new_status', newStatus);
         }
     } catch (error) {
         console.error(`Failed to process status with ID ${m.key.id}. Error: ${error.message}`);
     }
 }
 
-connectToWhatsApp();
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    // Start the WhatsApp connection process immediately
+    connectToWhatsApp(io);
+});
