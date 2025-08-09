@@ -1,14 +1,16 @@
 {
-  "name": "whatsapp-status-downloader",
+  "name": "whatsapp-ai-ad-manager",
   "version": "1.0.0",
-  "description": "A simple app to download WhatsApp statuses.",
+  "description": "An integrated application to download WhatsApp statuses and process them with an AI-powered ad management UI.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "build:frontend": "npm run build --prefix frontend"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
     "pino": "latest",
-    "qrcode-terminal": "latest"
+    "qrcode-terminal": "latest",
+    "express": "latest"
   }
 }

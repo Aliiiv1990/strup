@@ -1,13 +1,21 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
+const path = require('path');
+const express = require('express');
 const qrcode = require('qrcode-terminal');
 
-if (!fs.existsSync('./downloads')){
-    fs.mkdirSync('./downloads');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const DOWNLOAD_DIR = './downloads';
+if (!fs.existsSync(DOWNLOAD_DIR)){
+    fs.mkdirSync(DOWNLOAD_DIR);
 }
 
 const logger = pino({ level: 'silent' });
+
+// --- Baileys WhatsApp Client Logic ---
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
@@ -18,7 +26,6 @@ const getContactInfo = (jid, sock) => {
 
 const sanitizeFilename = (str, maxLength = 50) => {
     if (!str) return '';
-    // Remove invalid Windows filename characters and replace whitespace with underscores
     const sanitized = str.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_');
     return sanitized.substring(0, maxLength);
 };
@@ -29,7 +36,6 @@ async function connectToWhatsApp() {
     const sock = makeWASocket({
         auth: state,
         logger: logger,
-        // Implement the full history sync
         browser: Browsers.macOS('Desktop'),
         syncFullHistory: true,
     });
@@ -48,7 +54,7 @@ async function connectToWhatsApp() {
 
         if (qr) {
             qrcode.generate(qr, { small: true });
-            console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
+            console.log('QR code generated. Scan with WhatsApp.');
         }
 
         if (connection === 'close') {
@@ -58,15 +64,57 @@ async function connectToWhatsApp() {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
-            console.log('WhatsApp connection opened successfully.');
-            console.log('Waiting for history sync to get all active statuses...');
+            console.log('WhatsApp connection opened.');
         }
     });
+
+    const processStatusMessage = async (m) => {
+        try {
+            const senderJid = m.participant || m.key.participant;
+            if (!senderJid) return;
+
+            const { name } = getContactInfo(senderJid, sock);
+            const shortId = m.key.id.substring(0, 8);
+            console.log(`Processing status from: ${name} (ID: ${shortId})`);
+
+            let filename;
+            let buffer;
+
+            if (m.message?.imageMessage) {
+                const caption = m.message.imageMessage.caption || '';
+                const sanitizedCaption = sanitizeFilename(caption);
+                const sanitizedName = sanitizeFilename(name);
+                filename = `${sanitizedName}_${shortId}_${sanitizedCaption}.jpg`;
+
+                const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
+                buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+            } else if (m.message?.extendedTextMessage?.text) {
+                const text = m.message.extendedTextMessage.text;
+                const sanitizedName = sanitizeFilename(name);
+                filename = `${sanitizedName}_${shortId}.txt`;
+                fs.writeFileSync(path.join(DOWNLOAD_DIR, filename), text);
+                console.log(`Saved text status to ${filename}`);
+                return;
+            } else {
+                return; // Skip videos or other types
+            }
+
+            if (buffer && filename) {
+                fs.writeFileSync(path.join(DOWNLOAD_DIR, filename), buffer);
+                console.log(`Downloaded status to ${filename}`);
+            }
+        } catch (error) {
+            console.error(`Failed to process status with ID ${m.key.id}. Error: ${error.message}`);
+        }
+    };
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
         for (const m of messages) {
             if (m.key.remoteJid === 'status@broadcast') {
-                await processStatusMessage(m, sock);
+                await processStatusMessage(m);
             }
         }
     });
@@ -75,69 +123,60 @@ async function connectToWhatsApp() {
         console.log(`Received ${messages.length} messages from history sync.`);
         for (const m of messages) {
             if (m.key.remoteJid === 'status@broadcast') {
-                // Use a small delay to prevent rate limiting or overwhelming the file system
                 await new Promise(resolve => setTimeout(resolve, 200));
-                await processStatusMessage(m, sock);
+                await processStatusMessage(m);
             }
         }
         console.log('Finished processing history sync.');
     });
 }
 
-async function processStatusMessage(m, sock) {
-    try {
-        // Handle both live and historical status updates
-        const senderJid = m.participant || m.key.participant;
-        if (!senderJid) {
-            // This case should ideally not happen for a status, but as a safeguard:
-            console.log(`Could not determine sender for status update with ID: ${m.key.id}, skipping.`);
-            return;
+// --- Express Server API and Frontend Serving ---
+
+// API endpoint to get the list of downloaded statuses
+app.get('/api/statuses', (req, res) => {
+    fs.readdir(DOWNLOAD_DIR, (err, files) => {
+        if (err) {
+            console.error("Failed to read downloads directory:", err);
+            return res.status(500).json({ error: 'Failed to read statuses' });
         }
+        res.json(files.filter(file => file !== '.gitkeep')); // Exclude placeholder
+    });
+});
 
-        const { name, phone } = getContactInfo(senderJid, sock);
-        const shortId = m.key.id.substring(0, 8);
-        console.log(`Processing status from: ${name} (${phone}) - ID: ${shortId}`);
+// API endpoint to serve a specific downloaded file
+app.get('/files/:filename', (req, res) => {
+    const { filename } = req.params;
+    const sanitizedFilename = path.basename(filename); // Prevent directory traversal
+    const filePath = path.join(DOWNLOAD_DIR, sanitizedFilename);
 
-        let filename;
-        let buffer;
-
-        if (m.message?.imageMessage) {
-            console.log('Status is an image.');
-            const caption = m.message.imageMessage.caption || '';
-            const sanitizedCaption = sanitizeFilename(caption);
-            const sanitizedName = sanitizeFilename(name);
-            filename = `downloads/${sanitizedName}_${shortId}_${sanitizedCaption}.jpg`;
-
-            const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
-            buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
-        } else if (m.message?.videoMessage) {
-            console.log('Status is a video, skipping as requested.');
-            return;
-        } else if (m.message?.extendedTextMessage?.text) {
-            console.log('Status is text-only.');
-            const text = m.message.extendedTextMessage.text;
-            const sanitizedName = sanitizeFilename(name);
-            filename = `downloads/${sanitizedName}_${shortId}.txt`;
-
-            fs.writeFileSync(filename, text);
-            console.log(`Successfully saved text status from ${name} to ${filename}`);
-            return; // End processing for text
+    res.sendFile(filePath, { root: __dirname }, (err) => {
+        if (err) {
+            console.log(`Error serving file ${sanitizedFilename}:`, err);
+            res.status(404).send('File not found');
         }
-        else {
-            console.log('Status is not an image or text, skipping.');
-            return;
-        }
+    });
+});
 
-        if (buffer && filename) {
-            fs.writeFileSync(filename, buffer);
-            console.log(`Successfully downloaded status from ${name} to ${filename}`);
-        }
-    } catch (error) {
-        console.error(`Failed to process status with ID ${m.key.id}. Error: ${error.message}`);
+// Serve the static frontend from the 'frontend/dist' directory
+const frontendDistPath = path.join(__dirname, 'frontend', 'dist');
+app.use(express.static(frontendDistPath));
+
+// For any other request, serve the index.html of the frontend app
+app.get('*', (req, res) => {
+    const indexPath = path.join(frontendDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send(
+            `Frontend not built. Please run 'npm run build' in the 'frontend' directory.`
+        );
     }
-}
+});
 
-connectToWhatsApp();
+// Start the server and the WhatsApp client
+app.listen(PORT, () => {
+    console.log(`Server is running at http://localhost:${PORT}`);
+    console.log('Starting WhatsApp client...');
+    connectToWhatsApp().catch(err => console.error("Failed to connect to WhatsApp:", err));
+});
