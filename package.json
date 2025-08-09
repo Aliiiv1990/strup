@@ -1,16 +1,13 @@
 {
-  "name": "whatsapp-ai-ad-manager",
+  "name": "whatsapp-ai-ad-manager-root",
   "version": "1.0.0",
-  "description": "An integrated application to download WhatsApp statuses and process them with an AI-powered ad management UI.",
+  "description": "The root server for the integrated WhatsApp and AI ad manager application.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build:frontend": "npm run build --prefix frontend"
+    "build:frontend": "npm install --prefix frontend && npm run build --prefix frontend"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "latest",
-    "pino": "latest",
-    "qrcode-terminal": "latest",
     "express": "4.18.2"
   }
 }
