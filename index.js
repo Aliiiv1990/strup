@@ -1,4 +1,3 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
 const qrcode = require('qrcode-terminal');
@@ -24,6 +23,8 @@ const sanitizeFilename = (str, maxLength = 50) => {
 };
 
 async function connectToWhatsApp() {
+    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = await import('@whiskeysockets/baileys');
+
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
@@ -63,10 +64,21 @@ async function connectToWhatsApp() {
         }
     });
 
+    sock.ev.on('error', (err) => {
+        if (err.code === 'ECONNRESET') {
+            console.warn('Connection was reset, attempting to reconnect in 5 seconds...');
+            setTimeout(connectToWhatsApp, 5000);
+        } else {
+            console.error('An unhandled error occurred: ', err);
+        }
+    });
+
+    const processMessage = (m) => processStatusMessage(m, sock, downloadContentFromMessage);
+
     sock.ev.on('messages.upsert', async ({ messages }) => {
         for (const m of messages) {
             if (m.key.remoteJid === 'status@broadcast') {
-                await processStatusMessage(m, sock);
+                await processMessage(m);
             }
         }
     });
@@ -77,14 +89,14 @@ async function connectToWhatsApp() {
             if (m.key.remoteJid === 'status@broadcast') {
                 // Use a small delay to prevent rate limiting or overwhelming the file system
                 await new Promise(resolve => setTimeout(resolve, 200));
-                await processStatusMessage(m, sock);
+                await processMessage(m);
             }
         }
         console.log('Finished processing history sync.');
     });
 }
 
-async function processStatusMessage(m, sock) {
+async function processStatusMessage(m, sock, downloadContentFromMessage) {
     try {
         // Handle both live and historical status updates
         const senderJid = m.participant || m.key.participant;
