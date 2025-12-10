@@ -6,7 +6,7 @@ if (!fs.existsSync('./downloads')){
     fs.mkdirSync('./downloads');
 }
 
-const logger = pino({ level: 'silent' });
+const logger = pino({ level: 'info' });
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
@@ -49,27 +49,27 @@ async function connectToWhatsApp() {
 
         if (qr) {
             qrcode.generate(qr, { small: true });
-            console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
+            logger.info('QR code generated. Please scan it with your WhatsApp mobile app.');
         }
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed, reconnecting:', shouldReconnect);
+            logger.info({ shouldReconnect }, 'Connection closed, reconnecting');
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
-            console.log('WhatsApp connection opened successfully.');
-            console.log('Waiting for history sync to get all active statuses...');
+            logger.info('WhatsApp connection opened successfully.');
+            logger.info('Waiting for history sync to get all active statuses...');
         }
     });
 
     sock.ev.on('error', (err) => {
         if (err.code === 'ECONNRESET') {
-            console.warn('Connection was reset, attempting to reconnect in 5 seconds...');
+            logger.warn('Connection was reset, attempting to reconnect in 5 seconds...');
             setTimeout(connectToWhatsApp, 5000);
         } else {
-            console.error('An unhandled error occurred: ', err);
+            logger.error({ err }, 'An unhandled error occurred');
         }
     });
 
@@ -77,22 +77,30 @@ async function connectToWhatsApp() {
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
         for (const m of messages) {
-            if (m.key.remoteJid === 'status@broadcast') {
-                await processMessage(m);
+            try {
+                if (m.key.remoteJid === 'status@broadcast') {
+                    await processMessage(m);
+                }
+            } catch (err) {
+                logger.error({ err, msgId: m.key.id }, 'Failed to process incoming message');
             }
         }
     });
 
     sock.ev.on('messaging-history.set', async ({ messages }) => {
-        console.log(`Received ${messages.length} messages from history sync.`);
+        logger.info({ count: messages.length }, 'Received messages from history sync.');
         for (const m of messages) {
-            if (m.key.remoteJid === 'status@broadcast') {
-                // Use a small delay to prevent rate limiting or overwhelming the file system
-                await new Promise(resolve => setTimeout(resolve, 200));
-                await processMessage(m);
+            try {
+                if (m.key.remoteJid === 'status@broadcast') {
+                    // Use a small delay to prevent rate limiting or overwhelming the file system
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    await processMessage(m);
+                }
+            } catch (err) {
+                logger.error({ err, msgId: m.key.id }, 'Failed to process historical message');
             }
         }
-        console.log('Finished processing history sync.');
+        logger.info('Finished processing history sync.');
     });
 }
 
@@ -102,19 +110,19 @@ async function processStatusMessage(m, sock, downloadContentFromMessage) {
         const senderJid = m.participant || m.key.participant;
         if (!senderJid) {
             // This case should ideally not happen for a status, but as a safeguard:
-            console.log(`Could not determine sender for status update with ID: ${m.key.id}, skipping.`);
+            logger.warn({ msgId: m.key.id }, 'Could not determine sender for status update, skipping.');
             return;
         }
 
         const { name, phone } = getContactInfo(senderJid, sock);
         const shortId = m.key.id.substring(0, 8);
-        console.log(`Processing status from: ${name} (${phone}) - ID: ${shortId}`);
+        logger.info({ name, phone, msgId: shortId }, 'Processing status');
 
         let filename;
         let buffer;
 
         if (m.message?.imageMessage) {
-            console.log('Status is an image.');
+            logger.info('Status is an image.');
             const caption = m.message.imageMessage.caption || '';
             const sanitizedCaption = sanitizeFilename(caption);
             const sanitizedName = sanitizeFilename(name);
@@ -126,29 +134,29 @@ async function processStatusMessage(m, sock, downloadContentFromMessage) {
                 buffer = Buffer.concat([buffer, chunk]);
             }
         } else if (m.message?.videoMessage) {
-            console.log('Status is a video, skipping as requested.');
+            logger.info('Status is a video, skipping as requested.');
             return;
         } else if (m.message?.extendedTextMessage?.text) {
-            console.log('Status is text-only.');
+            logger.info('Status is text-only.');
             const text = m.message.extendedTextMessage.text;
             const sanitizedName = sanitizeFilename(name);
             filename = `downloads/${sanitizedName}_${shortId}.txt`;
 
             fs.writeFileSync(filename, text);
-            console.log(`Successfully saved text status from ${name} to ${filename}`);
+            logger.info({ name, filename }, 'Successfully saved text status');
             return; // End processing for text
         }
         else {
-            console.log('Status is not an image or text, skipping.');
+            logger.warn('Status is not an image or text, skipping.');
             return;
         }
 
         if (buffer && filename) {
             fs.writeFileSync(filename, buffer);
-            console.log(`Successfully downloaded status from ${name} to ${filename}`);
+            logger.info({ name, filename }, 'Successfully downloaded status');
         }
     } catch (error) {
-        console.error(`Failed to process status with ID ${m.key.id}. Error: ${error.message}`);
+        logger.error({ msgId: m.key.id, err: error.message }, 'Failed to process status');
     }
 }
 
