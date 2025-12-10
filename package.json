@@ -4,7 +4,7 @@
   "description": "A simple app to download WhatsApp statuses.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js | pino-pretty"
+    "start": "node index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",

@@ -6,7 +6,14 @@ if (!fs.existsSync('./downloads')){
     fs.mkdirSync('./downloads');
 }
 
-const logger = pino({ level: 'info' });
+const logger = pino({
+    level: 'info',
+    transport: {
+      target: 'pino-pretty'
+    }
+});
+
+const baileysLogger = pino({ level: 'silent' });
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
@@ -29,7 +36,7 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        logger: logger,
+        logger: baileysLogger,
         // Implement the full history sync
         browser: Browsers.macOS('Desktop'),
         syncFullHistory: true,
@@ -49,7 +56,7 @@ async function connectToWhatsApp() {
 
         if (qr) {
             qrcode.generate(qr, { small: true });
-            logger.info('QR code generated. Please scan it with your WhatsApp mobile app.');
+            console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
         }
 
         if (connection === 'close') {
