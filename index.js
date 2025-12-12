@@ -6,6 +6,23 @@ if (!fs.existsSync('./downloads')){
     fs.mkdirSync('./downloads');
 }
 
+// Parse command-line arguments
+const shouldCleanSession = process.argv.includes('--clean');
+
+if (shouldCleanSession) {
+    console.log('"--clean" flag detected. Removing old session data...');
+    try {
+        if (fs.existsSync('./auth_info_baileys')) {
+            fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
+            console.log('Session data cleared successfully.');
+        } else {
+            console.log('No session data found to clear.');
+        }
+    } catch (error) {
+        console.error('Failed to clear session data:', error);
+    }
+}
+
 const logger = pino({
     level: 'info',
     transport: {
@@ -13,7 +30,7 @@ const logger = pino({
     }
 });
 
-const baileysLogger = pino({ level: 'debug' });
+const baileysLogger = pino({ level: 'warn' });
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
