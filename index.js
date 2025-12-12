@@ -6,20 +6,19 @@ if (!fs.existsSync('./downloads')){
     fs.mkdirSync('./downloads');
 }
 
-// Parse command-line arguments
-const shouldCleanSession = process.argv.includes('--clean');
-
-if (shouldCleanSession) {
-    console.log('"--clean" flag detected. Removing old session data...');
+// One-time cleanup of old session data
+const sessionCleanupDoneMarker = './.session_cleanup_done';
+if (!fs.existsSync(sessionCleanupDoneMarker)) {
+    console.log('Performing one-time session cleanup...');
     try {
         if (fs.existsSync('./auth_info_baileys')) {
             fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
-            console.log('Session data cleared successfully.');
-        } else {
-            console.log('No session data found to clear.');
+            console.log('Old session data cleared successfully.');
         }
+        // Create a marker file to prevent this from running again
+        fs.writeFileSync(sessionCleanupDoneMarker, 'done');
     } catch (error) {
-        console.error('Failed to clear session data:', error);
+        console.error('Failed to clear old session data:', error);
     }
 }
 
@@ -47,7 +46,7 @@ const sanitizeFilename = (str, maxLength = 50) => {
 };
 
 async function connectToWhatsApp() {
-    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = await import('@whiskeysockets/baileys');
+    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = await import('baileys');
 
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
