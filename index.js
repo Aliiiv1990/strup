@@ -13,7 +13,7 @@ const logger = pino({
     }
 });
 
-const baileysLogger = pino({ level: 'silent' });
+const baileysLogger = pino({ level: 'debug' });
 
 const getContactInfo = (jid, sock) => {
     const contact = sock.contacts && sock.contacts[jid];
