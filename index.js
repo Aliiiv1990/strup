@@ -113,6 +113,7 @@ async function processStatusMessage(sock, msg) {
         let filePath;
 
         if (msg.message?.imageMessage) {
+            const caption = msg.message.imageMessage.caption || '';
             filePath = `${contactDir}/${shortId}.jpg`;
             if (fs.existsSync(filePath)) {
                 logger.info({ name, id: shortId }, 'Image status already downloaded.');
@@ -127,20 +128,16 @@ async function processStatusMessage(sock, msg) {
             fs.writeFileSync(filePath, buffer);
             logger.info({ name, path: filePath }, 'Image status downloaded.');
 
+            // Save the caption if it exists
+            if (caption) {
+                const captionPath = `${contactDir}/${shortId}.txt`;
+                fs.writeFileSync(captionPath, caption);
+                logger.info({ name, path: captionPath }, 'Saved image caption.');
+            }
+
         } else if (msg.message?.videoMessage) {
-            filePath = `${contactDir}/${shortId}.mp4`;
-            if (fs.existsSync(filePath)) {
-                logger.info({ name, id: shortId }, 'Video status already downloaded.');
-                return;
-            }
-            logger.info({ name, id: shortId }, 'Downloading video status...');
-            const stream = await downloadContentFromMessage(msg.message.videoMessage, 'video');
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
-            fs.writeFileSync(filePath, buffer);
-            logger.info({ name, path: filePath }, 'Video status downloaded.');
+            logger.info({ name, id: shortId }, 'Skipping video status as requested.');
+            return;
 
         } else if (msg.message?.extendedTextMessage) {
             const text = msg.message.extendedTextMessage.text;
