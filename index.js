@@ -1,26 +1,13 @@
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    downloadContentFromMessage,
+    Browsers
+} = require('baileys');
 const pino = require('pino');
 const fs = require('fs');
 const qrcode = require('qrcode-terminal');
-
-if (!fs.existsSync('./downloads')){
-    fs.mkdirSync('./downloads');
-}
-
-// One-time cleanup of old session data
-const sessionCleanupDoneMarker = './.session_cleanup_done';
-if (!fs.existsSync(sessionCleanupDoneMarker)) {
-    console.log('Performing one-time session cleanup...');
-    try {
-        if (fs.existsSync('./auth_info_baileys')) {
-            fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
-            console.log('Old session data cleared successfully.');
-        }
-        // Create a marker file to prevent this from running again
-        fs.writeFileSync(sessionCleanupDoneMarker, 'done');
-    } catch (error) {
-        console.error('Failed to clear old session data:', error);
-    }
-}
 
 const logger = pino({
     level: 'info',
@@ -29,158 +16,148 @@ const logger = pino({
     }
 });
 
-const baileysLogger = pino({ level: 'warn' });
+const baileysLogger = pino({ level: 'silent' });
+const downloadsDir = './downloads';
+const authDir = './auth_info_baileys';
 
-const getContactInfo = (jid, sock) => {
-    const contact = sock.contacts && sock.contacts[jid];
-    const name = contact?.name || contact?.notify || jid.split('@')[0];
-    const phone = jid.split('@')[0];
-    return { name, phone };
-};
+// Ensure downloads directory exists
+if (!fs.existsSync(downloadsDir)) {
+    fs.mkdirSync(downloadsDir);
+}
 
+// Function to sanitize filenames
 const sanitizeFilename = (str, maxLength = 50) => {
     if (!str) return '';
-    // Remove invalid Windows filename characters and replace whitespace with underscores
-    const sanitized = str.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_');
-    return sanitized.substring(0, maxLength);
+    return str.replace(/[\\/\\?%*:|"<>]/g, '').replace(/\\s+/g, '_').substring(0, maxLength);
 };
 
+// Main function to connect to WhatsApp
 async function connectToWhatsApp() {
-    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage, Browsers } = await import('baileys');
-
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
     const sock = makeWASocket({
         auth: state,
         logger: baileysLogger,
-        // Implement the full history sync
         browser: Browsers.macOS('Desktop'),
         syncFullHistory: true,
+        printQRInTerminal: true,
     });
 
-    sock.ev.on('contacts.upsert', (contacts) => {
-        sock.contacts = sock.contacts || {};
-        for (const contact of contacts) {
-            sock.contacts[contact.id] = contact;
-        }
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-
-    sock.ev.on('connection.update', async (update) => {
+    // Handle connection updates
+    sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            qrcode.generate(qr, { small: true });
-            console.log('QR code generated. Please scan it with your WhatsApp mobile app.');
+            logger.info('QR code generated. Scan with your phone.');
         }
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            logger.info({ shouldReconnect }, 'Connection closed, reconnecting');
+            logger.warn({ reason: lastDisconnect.error }, 'Connection closed. Reconnecting...');
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
             logger.info('WhatsApp connection opened successfully.');
-            logger.info('Waiting for history sync to get all active statuses...');
+            fetchAllStatuses(sock);
         }
     });
 
-    sock.ev.on('error', (err) => {
-        if (err.code === 'ECONNRESET') {
-            logger.warn('Connection was reset, attempting to reconnect in 5 seconds...');
-            setTimeout(connectToWhatsApp, 5000);
-        } else {
-            logger.error({ err }, 'An unhandled error occurred');
-        }
-    });
+    // Save credentials on update
+    sock.ev.on('creds.update', saveCreds);
 
-    const processMessage = (m) => processStatusMessage(m, sock, downloadContentFromMessage);
-
+    // Handle incoming messages, specifically for status updates
     sock.ev.on('messages.upsert', async ({ messages }) => {
-        for (const m of messages) {
-            try {
-                if (m.key.remoteJid === 'status@broadcast') {
-                    await processMessage(m);
-                }
-            } catch (err) {
-                logger.error({ err, msgId: m.key.id }, 'Failed to process incoming message');
+        for (const msg of messages) {
+            if (msg.key.remoteJid === 'status@broadcast') {
+                logger.info({ sender: msg.key.participant }, 'Received new status update.');
+                await processStatusMessage(sock, msg);
             }
         }
-    });
-
-    sock.ev.on('messaging-history.set', async ({ messages }) => {
-        logger.info({ count: messages.length }, 'Received messages from history sync.');
-        for (const m of messages) {
-            try {
-                if (m.key.remoteJid === 'status@broadcast') {
-                    // Use a small delay to prevent rate limiting or overwhelming the file system
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    await processMessage(m);
-                }
-            } catch (err) {
-                logger.error({ err, msgId: m.key.id }, 'Failed to process historical message');
-            }
-        }
-        logger.info('Finished processing history sync.');
     });
 }
 
-async function processStatusMessage(m, sock, downloadContentFromMessage) {
+// Function to fetch all contacts' statuses
+async function fetchAllStatuses(sock) {
+    logger.info('Fetching all statuses...');
     try {
-        // Handle both live and historical status updates
-        const senderJid = m.participant || m.key.participant;
-        if (!senderJid) {
-            // This case should ideally not happen for a status, but as a safeguard:
-            logger.warn({ msgId: m.key.id }, 'Could not determine sender for status update, skipping.');
-            return;
+        const statusJids = await sock.fetchStatusJids();
+        logger.info(`Found ${statusJids.length} contacts with statuses.`);
+        for (const jid of statusJids) {
+            const statuses = await sock.fetchStatus(jid);
+            logger.info({ jid, count: statuses.length }, 'Processing statuses for contact.');
+            for (const status of statuses) {
+                await processStatusMessage(sock, status);
+            }
+        }
+    } catch (error) {
+        logger.error({ error }, 'Failed to fetch statuses.');
+    }
+    logger.info('Finished fetching all statuses.');
+}
+
+// Function to process a single status message
+async function processStatusMessage(sock, msg) {
+    try {
+        const senderJid = msg.key.participant || msg.key.remoteJid;
+        const shortId = msg.key.id.substring(0, 8);
+        const contact = await sock.getContact(senderJid);
+        const name = contact?.name || contact?.notify || senderJid.split('@')[0];
+
+        // Create a directory for the contact if it doesn't exist
+        const contactDir = `${downloadsDir}/${sanitizeFilename(name)}`;
+        if (!fs.existsSync(contactDir)) {
+            fs.mkdirSync(contactDir);
         }
 
-        const { name, phone } = getContactInfo(senderJid, sock);
-        const shortId = m.key.id.substring(0, 8);
-        logger.info({ name, phone, msgId: shortId }, 'Processing status');
+        let filePath;
 
-        let filename;
-        let buffer;
-
-        if (m.message?.imageMessage) {
-            logger.info('Status is an image.');
-            const caption = m.message.imageMessage.caption || '';
-            const sanitizedCaption = sanitizeFilename(caption);
-            const sanitizedName = sanitizeFilename(name);
-            filename = `downloads/${sanitizedName}_${shortId}_${sanitizedCaption}.jpg`;
-
-            const stream = await downloadContentFromMessage(m.message.imageMessage, 'image');
-            buffer = Buffer.from([]);
+        if (msg.message?.imageMessage) {
+            filePath = `${contactDir}/${shortId}.jpg`;
+            if (fs.existsSync(filePath)) {
+                logger.info({ name, id: shortId }, 'Image status already downloaded.');
+                return;
+            }
+            logger.info({ name, id: shortId }, 'Downloading image status...');
+            const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
+            let buffer = Buffer.from([]);
             for await (const chunk of stream) {
                 buffer = Buffer.concat([buffer, chunk]);
             }
-        } else if (m.message?.videoMessage) {
-            logger.info('Status is a video, skipping as requested.');
-            return;
-        } else if (m.message?.extendedTextMessage?.text) {
-            logger.info('Status is text-only.');
-            const text = m.message.extendedTextMessage.text;
-            const sanitizedName = sanitizeFilename(name);
-            filename = `downloads/${sanitizedName}_${shortId}.txt`;
+            fs.writeFileSync(filePath, buffer);
+            logger.info({ name, path: filePath }, 'Image status downloaded.');
 
-            fs.writeFileSync(filename, text);
-            logger.info({ name, filename }, 'Successfully saved text status');
-            return; // End processing for text
-        }
-        else {
-            logger.warn('Status is not an image or text, skipping.');
-            return;
-        }
+        } else if (msg.message?.videoMessage) {
+            filePath = `${contactDir}/${shortId}.mp4`;
+            if (fs.existsSync(filePath)) {
+                logger.info({ name, id: shortId }, 'Video status already downloaded.');
+                return;
+            }
+            logger.info({ name, id: shortId }, 'Downloading video status...');
+            const stream = await downloadContentFromMessage(msg.message.videoMessage, 'video');
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
+            fs.writeFileSync(filePath, buffer);
+            logger.info({ name, path: filePath }, 'Video status downloaded.');
 
-        if (buffer && filename) {
-            fs.writeFileSync(filename, buffer);
-            logger.info({ name, filename }, 'Successfully downloaded status');
+        } else if (msg.message?.extendedTextMessage) {
+            const text = msg.message.extendedTextMessage.text;
+            filePath = `${contactDir}/${shortId}.txt`;
+            if (fs.existsSync(filePath)) {
+                logger.info({ name, id: shortId }, 'Text status already saved.');
+                return;
+            }
+            fs.writeFileSync(filePath, text);
+            logger.info({ name, path: filePath }, 'Text status saved.');
+        } else {
+            logger.warn({ name, id: shortId }, 'Status is not an image, video, or text. Skipping.');
         }
     } catch (error) {
-        logger.error({ msgId: m.key.id, err: error.message }, 'Failed to process status');
+        logger.error({ error, msgId: msg.key.id }, 'Failed to process status message.');
     }
 }
 
+// Start the application
 connectToWhatsApp();
