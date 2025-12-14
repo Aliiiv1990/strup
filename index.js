@@ -125,10 +125,6 @@ async function processStatusMessage(msg) {
 
             filePath = `${downloadsDir}/${filename}`;
 
-            if (fs.existsSync(filePath)) {
-                return; // Already downloaded
-            }
-
             logger.info({ name, id: shortId }, 'Downloading image status...');
             const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
             let buffer = Buffer.from([]);
@@ -144,9 +140,6 @@ async function processStatusMessage(msg) {
             const filename = `${sanitizedName}_${shortId}.txt`;
             filePath = `${downloadsDir}/${filename}`;
 
-            if (fs.existsSync(filePath)) {
-                return; // Already saved
-            }
             fs.writeFileSync(filePath, text);
             logger.info({ name, path: filePath }, 'Text status saved.');
 
