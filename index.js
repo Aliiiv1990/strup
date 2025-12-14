@@ -7,6 +7,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
+const qrcode = require('qrcode-terminal');
 
 const logger = pino({
     level: 'info',
@@ -30,7 +31,7 @@ if (!fs.existsSync(downloadsDir)) {
 // Function to sanitize filenames
 const sanitizeFilename = (str, maxLength = 50) => {
     if (!str) return '';
-    return str.replace(/[\\/\\?%*:|"<>]/g, '').replace(/\\s+/g, '_').substring(0, maxLength);
+    return str.replace(/[\\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_').substring(0, maxLength);
 };
 
 // Main function to connect to WhatsApp
@@ -42,7 +43,6 @@ async function connectToWhatsApp() {
         logger: baileysLogger,
         browser: Browsers.macOS('Desktop'),
         syncFullHistory: true,
-        printQRInTerminal: true,
     });
 
     // Handle connection updates
@@ -50,7 +50,8 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            logger.info('QR code generated. Scan with your phone.');
+            logger.info('QR code received, printing to terminal.');
+            qrcode.generate(qr, { small: true });
         }
 
         if (connection === 'close') {
