@@ -42,7 +42,7 @@ async function connectToWhatsApp() {
         auth: state,
         logger: baileysLogger,
         browser: Browsers.macOS('Desktop'),
-        syncFullHistory: true,
+        syncFullHistory: false,
     });
 
     // Handle connection updates
@@ -74,20 +74,12 @@ async function connectToWhatsApp() {
     });
 
     // Store contact information
-    sock.ev.on('contacts.upsert', (contacts) => {
+    sock.ev.on('contacts.set', ({ contacts }) => {
+        logger.info({ count: contacts.length }, 'Received contacts.');
         for (const contact of contacts) {
             contactStore[contact.id] = contact;
         }
-    });
-
-    // Process messages from history
-    sock.ev.on('messaging-history.set', ({ messages }) => {
-        logger.info({ count: messages.length }, 'Processing messages from history...');
-        for (const msg of messages) {
-            if (msg.key.remoteJid === 'status@broadcast') {
-                setTimeout(() => processStatusMessage(msg), 500);
-            }
-        }
+        fetchAllStatuses(sock);
     });
 
     // Handle incoming messages
@@ -155,6 +147,27 @@ async function processStatusMessage(msg) {
     } catch (error) {
         logger.error({ error, msgId: msg.key.id }, 'Failed to process status message.');
     }
+}
+
+// Function to fetch all contacts' statuses
+async function fetchAllStatuses(sock) {
+    logger.info('Fetching all statuses...');
+    try {
+        const jids = Object.keys(contactStore);
+        for (const jid of jids) {
+            if (jid.endsWith('@s.whatsapp.net')) {
+                const status = await sock.fetchStatus(jid);
+                if (status) {
+                    for (const msg of status) {
+                        await processStatusMessage(msg);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        logger.error({ error }, 'Failed to fetch statuses.');
+    }
+    logger.info('Finished fetching all statuses.');
 }
 
 // Start the application
