@@ -85,7 +85,7 @@ async function connectToWhatsApp() {
         logger.info({ count: messages.length }, 'Processing messages from history...');
         for (const msg of messages) {
             if (msg.key.remoteJid === 'status@broadcast') {
-                processStatusMessage(msg);
+                setTimeout(() => processStatusMessage(msg), 500);
             }
         }
     });
@@ -95,6 +95,7 @@ async function connectToWhatsApp() {
         for (const msg of messages) {
             if (msg.key.remoteJid === 'status@broadcast') {
                 logger.info({ sender: msg.key.participant }, 'Received new status update.');
+                await new Promise(resolve => setTimeout(resolve, 500));
                 await processStatusMessage(msg);
             }
         }
@@ -125,14 +126,18 @@ async function processStatusMessage(msg) {
 
             filePath = `${downloadsDir}/${filename}`;
 
-            logger.info({ name, id: shortId }, 'Downloading image status...');
-            const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
+            try {
+                logger.info({ name, id: shortId }, 'Downloading image status...');
+                const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+                fs.writeFileSync(filePath, buffer);
+                logger.info({ name, path: filePath }, 'Image status downloaded.');
+            } catch (error) {
+                logger.error({ error, msgId: msg.key.id }, 'Failed to download image status.');
             }
-            fs.writeFileSync(filePath, buffer);
-            logger.info({ name, path: filePath }, 'Image status downloaded.');
 
         } else if (msg.message?.extendedTextMessage) {
             const text = msg.message.extendedTextMessage.text;
