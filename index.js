@@ -21,7 +21,7 @@ const downloadsDir = './downloads';
 const authDir = './auth_info_baileys';
 
 // A simple in-memory store for contact information
-const contactStore = {};
+let contactStore = {};
 
 // Ensure downloads directory exists
 if (!fs.existsSync(downloadsDir)) {
@@ -37,6 +37,8 @@ const sanitizeFilename = (str, maxLength = 50) => {
 // Main function to connect to WhatsApp
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    // prime the contact store with existing contacts
+    contactStore = state.creds.contacts || {};
 
     const sock = makeWASocket({
         auth: state,
@@ -62,6 +64,7 @@ async function connectToWhatsApp() {
             }
         } else if (connection === 'open') {
             logger.info('WhatsApp connection opened successfully.');
+            fetchAllStatuses(sock);
         }
     });
 
@@ -71,15 +74,6 @@ async function connectToWhatsApp() {
     // A general error handler
     sock.ev.on('error', (err) => {
         logger.error({ err }, 'An unexpected error occurred.');
-    });
-
-    // Store contact information
-    sock.ev.on('contacts.set', ({ contacts }) => {
-        logger.info({ count: contacts.length }, 'Received contacts.');
-        for (const contact of contacts) {
-            contactStore[contact.id] = contact;
-        }
-        fetchAllStatuses(sock);
     });
 
     // Handle incoming messages
@@ -101,47 +95,45 @@ async function processStatusMessage(msg) {
         if (!senderJid) return;
 
         const shortId = msg.key.id.substring(0, 8);
-        const contact = contactStore[senderJid];
-        const name = contact?.name || contact?.notify || senderJid.split('@')[0];
+        const phoneNumber = senderJid.split('@')[0];
 
         let filePath;
 
         if (msg.message?.imageMessage) {
             const caption = msg.message.imageMessage.caption || '';
-            const sanitizedName = sanitizeFilename(name, 50);
             const sanitizedCaption = sanitizeFilename(caption, 100);
 
-            let filename = `${sanitizedName}_${sanitizedCaption}_${shortId}.jpg`;
+            // Construct filename and ensure it's a safe length
+            let filename = `${phoneNumber}_${sanitizedCaption}_${shortId}.jpg`;
             if (filename.length > 200) {
-                filename = `${sanitizedName}_${sanitizedCaption.substring(0, 100)}_${shortId}.jpg`;
+                filename = `${phoneNumber}_${sanitizedCaption.substring(0, 100)}_${shortId}.jpg`;
             }
 
             filePath = `${downloadsDir}/${filename}`;
 
             try {
-                logger.info({ name, id: shortId }, 'Downloading image status...');
+                logger.info({ phone: phoneNumber, id: shortId }, 'Downloading image status...');
                 const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
                 let buffer = Buffer.from([]);
                 for await (const chunk of stream) {
                     buffer = Buffer.concat([buffer, chunk]);
                 }
                 fs.writeFileSync(filePath, buffer);
-                logger.info({ name, path: filePath }, 'Image status downloaded.');
+                logger.info({ phone: phoneNumber, path: filePath }, 'Image status downloaded.');
             } catch (error) {
                 logger.error({ error, msgId: msg.key.id }, 'Failed to download image status.');
             }
 
         } else if (msg.message?.extendedTextMessage) {
             const text = msg.message.extendedTextMessage.text;
-            const sanitizedName = sanitizeFilename(name, 50);
-            const filename = `${sanitizedName}_${shortId}.txt`;
+            const filename = `${phoneNumber}_${shortId}.txt`;
             filePath = `${downloadsDir}/${filename}`;
 
             fs.writeFileSync(filePath, text);
-            logger.info({ name, path: filePath }, 'Text status saved.');
+            logger.info({ phone: phoneNumber, path: filePath }, 'Text status saved.');
 
         } else if (msg.message?.videoMessage) {
-            logger.info({ name, id: shortId }, 'Skipping video status as requested.');
+            logger.info({ phone: phoneNumber, id: shortId }, 'Skipping video status as requested.');
         }
 
     } catch (error) {
