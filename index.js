@@ -86,81 +86,86 @@ async function connectToWhatsApp() {
             }
         }
     });
-}
 
-// Function to process a single status message
-async function processStatusMessage(msg) {
-    try {
-        const senderJid = msg.key.participant;
-        if (!senderJid) return;
+    // Function to process a single status message
+    async function processStatusMessage(msg) {
+        try {
+            const senderJid = msg.key.participant;
+            if (!senderJid) return;
 
-        const shortId = msg.key.id.substring(0, 8);
-        const phoneNumber = senderJid.split('@')[0];
+            const shortId = msg.key.id.substring(0, 8);
+            const phoneNumber = senderJid.split('@')[0];
 
-        let filePath;
+            let filePath;
 
-        if (msg.message?.imageMessage) {
-            const caption = msg.message.imageMessage.caption || '';
-            const sanitizedCaption = sanitizeFilename(caption, 100);
+            if (msg.message?.imageMessage) {
+                const caption = msg.message.imageMessage.caption || '';
+                const sanitizedCaption = sanitizeFilename(caption, 100);
 
-            // Construct filename and ensure it's a safe length
-            let filename = `${phoneNumber}_${sanitizedCaption}_${shortId}.jpg`;
-            if (filename.length > 200) {
-                filename = `${phoneNumber}_${sanitizedCaption.substring(0, 100)}_${shortId}.jpg`;
-            }
-
-            filePath = `${downloadsDir}/${filename}`;
-
-            try {
-                logger.info({ phone: phoneNumber, id: shortId }, 'Downloading image status...');
-                const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
-                let buffer = Buffer.from([]);
-                for await (const chunk of stream) {
-                    buffer = Buffer.concat([buffer, chunk]);
+                // Construct filename and ensure it's a safe length
+                let filename = `${phoneNumber}_${sanitizedCaption}_${shortId}.jpg`;
+                if (filename.length > 200) {
+                    filename = `${phoneNumber}_${sanitizedCaption.substring(0, 100)}_${shortId}.jpg`;
                 }
-                fs.writeFileSync(filePath, buffer);
-                logger.info({ phone: phoneNumber, path: filePath }, 'Image status downloaded.');
-            } catch (error) {
-                logger.error({ error, msgId: msg.key.id }, 'Failed to download image status.');
+
+                filePath = `${downloadsDir}/${filename}`;
+
+                try {
+                    logger.info({ phone: phoneNumber, id: shortId }, 'Downloading image status...');
+                    const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) {
+                        buffer = Buffer.concat([buffer, chunk]);
+                    }
+                    fs.writeFileSync(filePath, buffer);
+                    logger.info({ phone: phoneNumber, path: filePath }, 'Image status downloaded.');
+                } catch (error) {
+                    logger.error({ error, msgId: msg.key.id }, 'Failed to download image status.');
+                }
+
+            } else if (msg.message?.extendedTextMessage) {
+                const text = msg.message.extendedTextMessage.text;
+                const filename = `${phoneNumber}_${shortId}.txt`;
+                filePath = `${downloadsDir}/${filename}`;
+
+                fs.writeFileSync(filePath, text);
+                logger.info({ phone: phoneNumber, path: filePath }, 'Text status saved.');
+
+            } else if (msg.message?.videoMessage) {
+                logger.info({ phone: phoneNumber, id: shortId }, 'Skipping video status as requested.');
             }
 
-        } else if (msg.message?.extendedTextMessage) {
-            const text = msg.message.extendedTextMessage.text;
-            const filename = `${phoneNumber}_${shortId}.txt`;
-            filePath = `${downloadsDir}/${filename}`;
-
-            fs.writeFileSync(filePath, text);
-            logger.info({ phone: phoneNumber, path: filePath }, 'Text status saved.');
-
-        } else if (msg.message?.videoMessage) {
-            logger.info({ phone: phoneNumber, id: shortId }, 'Skipping video status as requested.');
+        } catch (error) {
+            logger.error({ error, msgId: msg.key.id }, 'Failed to process status message.');
         }
-
-    } catch (error) {
-        logger.error({ error, msgId: msg.key.id }, 'Failed to process status message.');
     }
-}
 
-// Function to fetch all contacts' statuses
-async function fetchAllStatuses(sock) {
-    logger.info('Fetching all statuses...');
-    try {
-        const jids = Object.keys(contactStore);
-        for (const jid of jids) {
-            if (jid.endsWith('@s.whatsapp.net')) {
-                const status = await sock.fetchStatus(jid);
-                if (status) {
-                    for (const msg of status) {
-                        await processStatusMessage(msg);
+    // Function to fetch all contacts' statuses
+    async function fetchAllStatuses(sock) {
+        logger.info('Fetching all statuses...');
+        try {
+            const jids = Object.keys(contactStore);
+            for (const jid of jids) {
+                if (jid.endsWith('@s.whatsapp.net')) {
+                    const status = await sock.fetchStatus(jid);
+                    if (status) {
+                        for (const msg of status) {
+                            await processStatusMessage(msg);
+                        }
                     }
                 }
             }
+        } catch (error) {
+            logger.error({ error }, 'Failed to fetch statuses.');
         }
-    } catch (error) {
-        logger.error({ error }, 'Failed to fetch statuses.');
+        logger.info('Finished fetching all statuses.');
     }
-    logger.info('Finished fetching all statuses.');
 }
+
+// Global crash protector
+process.on('uncaughtException', (err, origin) => {
+    logger.fatal({ err, origin }, 'Uncaught exception. This is a critical error, but the application will not crash.');
+});
 
 // Start the application
 connectToWhatsApp();
